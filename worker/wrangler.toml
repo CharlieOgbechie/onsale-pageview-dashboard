@@ -1,0 +1,17 @@
+name = "onsale-dashboard-qa"
+main = "worker.js"
+compatibility_date = "2026-01-01"
+
+# Non-secret config. ANTHROPIC_API_KEY and SITE_KEY are set separately as secrets
+# (wrangler secret put ...) so they never end up in this file or in git.
+[vars]
+DASHBOARD_ORIGIN = "https://charlieogbechie.github.io"
+DATA_BASE_URL = "https://charlieogbechie.github.io/onsale-pageview-dashboard"
+
+# Optional: lightweight benchmark "memory" across questions. Create the namespace with
+# `wrangler kv namespace create BENCHMARK_MEMORY` and paste the resulting id below.
+# If you skip this, the Worker still works -- it just won't remember benchmark context
+# between questions.
+# [[kv_namespaces]]
+# binding = "BENCHMARK_MEMORY"
+# id = "REPLACE_WITH_NAMESPACE_ID"

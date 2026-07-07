@@ -154,13 +154,54 @@ you can switch to the fully self-hosted path instead of relying on a Claude sche
    flat insight format (no `category`/early-read split) — bring it in line with the scheduled
    task's prompt (ask Claude to update it) before relying on it long-term.
 
+## "Ask a question" — live Q&A setup
+
+The dashboard has an "Ask a question" box that calls Claude live, answering from the current
+`data/onsales.json` / `venue-baselines.json` / `insights.json` (not raw Drive sheets directly —
+giving the backend its own Drive access would hit the same Google Cloud/IT-policy wall described
+above, so it works from the same structured data the rest of the dashboard uses, refreshed
+hourly by the scheduled sync). It follows a specific methodology: venue-match-first benchmarking,
+insight-first structured answers (key insights, comparison basis, trends, risks/gaps, demand
+readout, reports used), and a lightweight cross-question "memory" of established comparison sets
+— see `worker/worker.js` for the exact system prompt if you want to tune it.
+
+Since GitHub Pages can't hold an API key, this needs a small backend: a Cloudflare Worker.
+
+### Deploy the Worker
+
+1. Install Wrangler if you don't have it: `npm install -g wrangler`, then `wrangler login`
+   (creates a free Cloudflare account if you don't have one — no IT approval needed).
+2. From the `worker/` folder: `wrangler deploy`. Note the `*.workers.dev` URL it prints.
+3. Set secrets (never go in `wrangler.toml` or git):
+   ```
+   wrangler secret put ANTHROPIC_API_KEY
+   wrangler secret put SITE_KEY
+   ```
+   `SITE_KEY` can be any string you make up — see the risk callout below for why it exists.
+4. Optional (for the "memory" feature): `wrangler kv namespace create BENCHMARK_MEMORY`, then
+   uncomment and fill in the `[[kv_namespaces]]` block in `wrangler.toml` with the printed id,
+   and `wrangler deploy` again. Without this, Q&A still works, it just won't remember benchmark
+   context between separate questions.
+5. In `index.html`, near the bottom of the `<script>` block, replace:
+   - `ASK_ENDPOINT` with `https://<your-worker>.workers.dev/ask`
+   - `ASK_SITE_KEY` with the same string you set as the `SITE_KEY` secret
+6. Push and refresh the dashboard.
+
+### ⚠️ Known risk: this is a public endpoint on a public repo
+
+The repo (and therefore this JS, including whatever you put in `ASK_SITE_KEY`) is public, so
+`SITE_KEY` is a scraping deterrent, not real security — anyone motivated enough can read it out
+of the page source and call the Worker directly, which spends your Anthropic API quota. For a
+small internal tool this is a reasonable tradeoff, but if usage/cost becomes a concern, consider:
+Cloudflare's free rate-limiting rules on the Worker route, swapping in a real per-user auth
+scheme, or taking the dashboard back to private hosting (see the GitHub Pages visibility tradeoff
+earlier in this README).
+
 ## Extending this base
 
-Ideas for a v3, not built yet:
-- Live in-browser Q&A (ask Claude a free-text question about the data) — needs a small serverless
-  proxy (e.g. a Cloudflare Worker) to keep an API key off the client if going the GitHub Action
-  route; not needed for the scheduled-task approach since no client-side key is ever involved.
+Ideas for a v4, not built yet:
 - Per-tour trend lines (views over hours-since-announcement) rather than single-point comparisons.
 - Slack/email digest of the precomputed insights (especially early-read ones) after each sync.
 - Auto-push from the scheduled task once GitHub write access is sorted, removing the manual
   `git push` step entirely.
+- Real per-user auth on the Q&A Worker instead of the shared "site key" deterrent.

@@ -168,6 +168,31 @@
     border-radius: 6px;
     font-size: 13px;
   }
+  .ask-box { display: flex; gap: 8px; margin-bottom: 16px; }
+  .ask-box input { flex: 1; }
+  .ask-box button {
+    background: var(--accent);
+    border: none;
+    color: #0f1115;
+    font-weight: 600;
+    border-radius: 6px;
+    padding: 8px 18px;
+    font-size: 13px;
+    cursor: pointer;
+  }
+  .ask-box button:disabled { opacity: 0.5; cursor: default; }
+  .ask-section { margin-bottom: 14px; }
+  .ask-section h4 { margin: 0 0 6px; font-size: 13px; color: var(--accent); }
+  .ask-section p { margin: 0; font-size: 13px; line-height: 1.5; color: var(--text); }
+  .ask-section ul { margin: 0; padding-left: 18px; font-size: 13px; line-height: 1.6; }
+  .ask-error {
+    border-left: 3px solid var(--bad);
+    background: var(--panel-2);
+    padding: 10px 12px;
+    border-radius: 0 6px 6px 0;
+    font-size: 13px;
+    color: var(--bad);
+  }
   .view-toggle { display: flex; gap: 6px; margin-bottom: 14px; }
   .view-toggle button {
     background: var(--panel-2);
@@ -295,6 +320,19 @@
   <div class="panel">
     <p class="section-title">Page view commentary</p>
     <div id="insights"><div class="empty">Loading insights…</div></div>
+  </div>
+
+  <div class="panel">
+    <p class="section-title">Ask a question</p>
+    <p class="compare-hint" style="margin:-6px 0 12px;">
+      Ask about a tour, a venue benchmark, or "what changed" — this calls Claude live against the
+      current data. Answers can take a few seconds.
+    </p>
+    <div class="ask-box">
+      <input id="askInput" placeholder="e.g. How does BTS's Tottenham Hotspur pacing compare to other stadium tours there?" />
+      <button id="askSubmit" type="button">Ask</button>
+    </div>
+    <div id="askAnswer"></div>
   </div>
 </main>
 
@@ -950,6 +988,76 @@ async function loadData() {
 }
 
 loadData();
+
+// --------------------------------------------------------------------------
+// Ask a question -- live Claude call via the Cloudflare Worker backend.
+// The Worker holds the API key server-side; this page never sees it.
+// --------------------------------------------------------------------------
+
+// Fill these in after deploying the Worker (see worker/README / main README "Ask a question"
+// setup section). SITE_KEY matches the Worker's SITE_KEY secret -- it's a scraping deterrent,
+// not real security, since it ships in this public JS.
+const ASK_ENDPOINT = "PASTE_YOUR_WORKER_URL_HERE/ask";
+const ASK_SITE_KEY = "PASTE_YOUR_SITE_KEY_HERE";
+
+function renderAskAnswer(answer) {
+  const el = document.getElementById('askAnswer');
+  const section = (title, html) => html ? `<div class="ask-section"><h4>${title}</h4>${html}</div>` : '';
+  const list = (arr) => (arr && arr.length) ? `<ul>${arr.map(x => `<li>${x}</li>`).join('')}</ul>` : '';
+  const badges = (arr) => (arr && arr.length) ? arr.map(r => `<span class="badge">${r}</span>`).join(' ') : '';
+
+  const html = [
+    section('Key insights', list(answer.key_insights)),
+    section('Comparison basis', answer.comparison_basis ? `<p>${answer.comparison_basis}</p>` : ''),
+    section('Trends or changes', list(answer.trends_or_changes)),
+    section('Risks, anomalies, or gaps', list(answer.risks_or_gaps)),
+    section('Demand readout', answer.demand_readout ? `<p>${answer.demand_readout}</p>` : ''),
+    section('Reports used', badges(answer.reports_used)),
+  ].join('');
+
+  el.innerHTML = html || '<div class="empty">No answer content came back — try rephrasing the question.</div>';
+}
+
+async function askQuestion() {
+  const input = document.getElementById('askInput');
+  const button = document.getElementById('askSubmit');
+  const el = document.getElementById('askAnswer');
+  const question = input.value.trim();
+  if (!question) return;
+
+  if (ASK_ENDPOINT.includes('PASTE_YOUR')) {
+    el.innerHTML = '<div class="ask-error">The Q&A backend hasn\'t been deployed/configured yet — see the "Ask a question" setup section in the README (deploy the Cloudflare Worker, then fill in ASK_ENDPOINT and ASK_SITE_KEY near the bottom of this file).</div>';
+    return;
+  }
+
+  button.disabled = true;
+  button.textContent = 'Asking…';
+  el.innerHTML = '<div class="empty">Thinking — this calls Claude live, usually takes a few seconds…</div>';
+
+  try {
+    const res = await fetch(ASK_ENDPOINT, {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json', 'X-Site-Key': ASK_SITE_KEY },
+      body: JSON.stringify({ question }),
+    });
+    const data = await res.json();
+    if (!res.ok) {
+      el.innerHTML = `<div class="ask-error">${data.error || `Request failed (${res.status})`}</div>`;
+    } else {
+      renderAskAnswer(data.answer || {});
+    }
+  } catch (e) {
+    el.innerHTML = `<div class="ask-error">Couldn't reach the Q&A backend: ${e.message}</div>`;
+  } finally {
+    button.disabled = false;
+    button.textContent = 'Ask';
+  }
+}
+
+document.getElementById('askSubmit').addEventListener('click', askQuestion);
+document.getElementById('askInput').addEventListener('keydown', (e) => {
+  if (e.key === 'Enter') askQuestion();
+});
 </script>
 </body>
 </html>
