@@ -175,6 +175,25 @@
   .pace-below { color: var(--bad); font-weight: 600; }
   .pace-onpar { color: var(--accent-2); font-weight: 600; }
   .pace-unknown { color: var(--muted); }
+  .pagination {
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    gap: 12px;
+    margin-top: 14px;
+    font-size: 13px;
+    color: var(--muted);
+  }
+  .pagination button {
+    background: var(--panel-2);
+    border: 1px solid var(--border);
+    color: var(--text);
+    border-radius: 6px;
+    padding: 5px 12px;
+    font-size: 13px;
+    cursor: pointer;
+  }
+  .pagination button:disabled { opacity: 0.4; cursor: default; }
 </style>
 </head>
 <body>
@@ -192,8 +211,8 @@
     <p class="section-title">Compare shows</p>
 
     <div class="view-toggle">
-      <button type="button" id="viewShowBtn" class="active">By show</button>
-      <button type="button" id="viewTourBtn">By tour</button>
+      <button type="button" id="viewShowBtn">By show</button>
+      <button type="button" id="viewTourBtn" class="active">By tour</button>
     </div>
 
     <div class="compare-picker">
@@ -234,11 +253,15 @@
 
     <div id="comparisonSummary" class="panel comparison-summary" style="display:none;"></div>
 
-    <p class="section-title" id="tableTitle" style="margin-top:24px;">All shows</p>
+    <div style="display:flex; align-items:baseline; justify-content:space-between; margin-top:24px;">
+      <p class="section-title" id="tableTitle" style="margin:0;">All shows</p>
+      <span class="compare-hint" id="tableCount"></span>
+    </div>
     <table id="dataTable">
       <thead><tr></tr></thead>
       <tbody></tbody>
     </table>
+    <div id="tablePagination" class="pagination"></div>
   </div>
 
   <div class="panel">
@@ -251,10 +274,11 @@
 const state = {
   onsales: [],
   insights: null,
-  sort: { key: 'edp', dir: 'desc' },
+  sort: { key: 'total', dir: 'desc' },
   compareArtists: [],
-  viewMode: 'show', // 'show' | 'tour'
+  viewMode: 'tour', // 'show' | 'tour' — defaults to tour so the table starts as a short summary, not 600+ rows
   venueMap: {}, // lowercase venue name -> { capacity, venue_type }
+  page: 1,
 };
 const COMPARE_PALETTE = ['#6ea8fe', '#f2b84b', '#4fd18b', '#f27272', '#c792ea'];
 const MAX_COMPARE = 5;
@@ -443,6 +467,7 @@ function renderChips() {
   el.querySelectorAll('button').forEach(btn => {
     btn.addEventListener('click', () => {
       state.compareArtists = state.compareArtists.filter(a => a !== btn.dataset.artist);
+      state.page = 1;
       renderChips();
       renderAll();
     });
@@ -461,6 +486,7 @@ function addCompareArtist(name) {
   if (state.compareArtists.includes(match)) return false;
   if (state.compareArtists.length >= MAX_COMPARE) return false;
   state.compareArtists.push(match);
+  state.page = 1;
   renderChips();
   renderAll();
   return true;
@@ -590,6 +616,32 @@ function sortRows(rows, key, dir) {
   });
 }
 
+const PAGE_SIZE = 20;
+
+function paginate(rows) {
+  const total = rows.length;
+  const totalPages = Math.max(1, Math.ceil(total / PAGE_SIZE));
+  if (state.page > totalPages) state.page = totalPages;
+  if (state.page < 1) state.page = 1;
+  const start = (state.page - 1) * PAGE_SIZE;
+  return { pageRows: rows.slice(start, start + PAGE_SIZE), total, totalPages, start };
+}
+
+function renderPaginationControls(total, totalPages, start, label) {
+  document.getElementById('tableCount').textContent = total
+    ? `Showing ${start + 1}-${Math.min(start + PAGE_SIZE, total)} of ${total} ${label}`
+    : '';
+  const el = document.getElementById('tablePagination');
+  if (totalPages <= 1) { el.innerHTML = ''; return; }
+  el.innerHTML = `
+    <button id="pagePrev" ${state.page <= 1 ? 'disabled' : ''}>‹ Prev</button>
+    <span>Page ${state.page} of ${totalPages}</span>
+    <button id="pageNext" ${state.page >= totalPages ? 'disabled' : ''}>Next ›</button>
+  `;
+  document.getElementById('pagePrev').addEventListener('click', () => { state.page--; renderTable(); });
+  document.getElementById('pageNext').addEventListener('click', () => { state.page++; renderTable(); });
+}
+
 function bindSortHeaders() {
   document.querySelectorAll('#dataTable th[data-key]').forEach(th => {
     th.addEventListener('click', () => {
@@ -633,8 +685,10 @@ function renderShowTable() {
   const { key, dir } = state.sort;
   rows = sortRows(rows, key, dir);
 
+  const { pageRows, total, totalPages, start } = paginate(rows);
+
   const tbody = document.querySelector('#dataTable tbody');
-  tbody.innerHTML = rows.map(r => `
+  tbody.innerHTML = pageRows.map(r => `
     <tr>
       <td>${r.artist}${r.anomaly ? ' <span class="badge anomaly-badge">anomaly</span>' : ''}</td>
       <td>${r.venue}</td>
@@ -648,6 +702,8 @@ function renderShowTable() {
       <td class="${r.pacing ? r.pacing.cls : ''}" title="${r.pacing ? r.pacing.label : ''}">${r.pacing ? r.pacing.symbol : '—'}</td>
     </tr>
   `).join('') || '<tr><td colspan="10" class="empty">No shows match these filters.</td></tr>';
+
+  renderPaginationControls(total, totalPages, start, 'shows');
 }
 
 function renderTourTable() {
@@ -673,8 +729,10 @@ function renderTourTable() {
   const sortKey = ['artist', 'showCount', 'tier', 'total', 'avg', 'avgPresale', 'avgOnsale'].includes(key) ? key : 'total';
   tours = sortRows(tours, sortKey, sortKey === key ? dir : 'desc');
 
+  const { pageRows, total, totalPages, start } = paginate(tours);
+
   const tbody = document.querySelector('#dataTable tbody');
-  tbody.innerHTML = tours.map(t => `
+  tbody.innerHTML = pageRows.map(t => `
     <tr>
       <td>${t.artist}${t.key !== t.artist ? `<br><span class="badge">${t.key}</span>` : ''}</td>
       <td>${t.showCount}</td>
@@ -691,6 +749,8 @@ function renderTourTable() {
       </td>
     </tr>
   `).join('') || '<tr><td colspan="9" class="empty">No tours match these filters.</td></tr>';
+
+  renderPaginationControls(total, totalPages, start, 'tours');
 }
 
 function renderTable() {
@@ -735,11 +795,12 @@ compareInput.addEventListener('change', () => {
 });
 
 ['searchBox', 'metricSelect', 'hourSelect', 'tierSelect', 'yearSelect', 'venueTypeSelect', 'excludeAnomalies'].forEach(id => {
-  document.getElementById(id).addEventListener('input', renderAll);
+  document.getElementById(id).addEventListener('input', () => { state.page = 1; renderAll(); });
 });
 
 function setViewMode(mode) {
   state.viewMode = mode;
+  state.page = 1;
   document.getElementById('viewShowBtn').classList.toggle('active', mode === 'show');
   document.getElementById('viewTourBtn').classList.toggle('active', mode === 'tour');
   state.sort = mode === 'tour' ? { key: 'total', dir: 'desc' } : { key: 'edp', dir: 'desc' };
