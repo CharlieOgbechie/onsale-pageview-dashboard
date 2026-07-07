@@ -96,6 +96,65 @@
     color: var(--muted);
   }
   .anomaly-badge { border-color: var(--bad); color: var(--bad); }
+  .compare-picker {
+    display: flex;
+    flex-wrap: wrap;
+    align-items: center;
+    gap: 8px;
+    margin-bottom: 14px;
+    padding: 10px 12px;
+    background: var(--panel-2);
+    border: 1px solid var(--border);
+    border-radius: 8px;
+  }
+  .compare-picker input {
+    flex: 1;
+    min-width: 160px;
+  }
+  .chip {
+    display: flex;
+    align-items: center;
+    gap: 6px;
+    background: var(--panel);
+    border: 1px solid var(--border);
+    border-radius: 20px;
+    padding: 4px 6px 4px 10px;
+    font-size: 12.5px;
+  }
+  .chip .dot { width: 9px; height: 9px; border-radius: 50%; flex-shrink: 0; }
+  .chip button {
+    background: none;
+    border: none;
+    color: var(--muted);
+    cursor: pointer;
+    font-size: 14px;
+    line-height: 1;
+    padding: 2px 4px;
+  }
+  .chip button:hover { color: var(--text); }
+  .compare-hint { font-size: 12px; color: var(--muted); }
+  .comparison-summary { margin: -4px 0 18px; }
+  .comparison-summary .artist-line {
+    display: flex;
+    align-items: baseline;
+    gap: 8px;
+    padding: 8px 0;
+    border-bottom: 1px solid var(--border);
+    font-size: 13px;
+  }
+  .comparison-summary .artist-line:last-of-type { border-bottom: none; }
+  .comparison-summary .dot { width: 10px; height: 10px; border-radius: 50%; flex-shrink: 0; }
+  .comparison-summary .artist-name { font-weight: 600; min-width: 130px; }
+  .comparison-summary .artist-stats { color: var(--muted); }
+  .comparison-summary .takeaway {
+    margin-top: 10px;
+    padding: 10px 12px;
+    background: var(--panel-2);
+    border-radius: 6px;
+    font-size: 12.5px;
+    color: var(--muted);
+    line-height: 1.5;
+  }
 </style>
 </head>
 <body>
@@ -111,8 +170,16 @@
 <main>
   <div class="panel">
     <p class="section-title">Compare shows</p>
+
+    <div class="compare-picker">
+      <span class="compare-hint">Compare artists:</span>
+      <input list="artistList" id="compareInput" placeholder="Type an artist name and press Enter… (up to 5)" />
+      <datalist id="artistList"></datalist>
+      <div id="compareChips" style="display:flex; flex-wrap:wrap; gap:8px;"></div>
+    </div>
+
     <div class="filters">
-      <input id="searchBox" placeholder="Search artist or venue…" />
+      <input id="searchBox" placeholder="Or just search/browse all shows…" />
       <select id="metricSelect">
         <option value="edp">EDP views (event page)</option>
         <option value="adp">ADP views (artist page)</option>
@@ -133,6 +200,8 @@
       </label>
     </div>
     <div class="chart-wrap"><canvas id="mainChart"></canvas></div>
+
+    <div id="comparisonSummary" class="panel comparison-summary" style="display:none;"></div>
 
     <p class="section-title" style="margin-top:24px;">All shows</p>
     <table id="dataTable">
@@ -160,7 +229,14 @@
 </main>
 
 <script>
-const state = { onsales: [], insights: null, sort: { key: 'edp', dir: 'desc' } };
+const state = { onsales: [], insights: null, sort: { key: 'edp', dir: 'desc' }, compareArtists: [] };
+const COMPARE_PALETTE = ['#6ea8fe', '#f2b84b', '#4fd18b', '#f27272', '#c792ea'];
+const MAX_COMPARE = 5;
+
+function artistColor(artist) {
+  const idx = state.compareArtists.indexOf(artist);
+  return idx === -1 ? '#6ea8fe' : COMPARE_PALETTE[idx % COMPARE_PALETTE.length];
+}
 
 function maxHourKey(record, field) {
   const obj = record[field] || {};
@@ -217,11 +293,15 @@ function filteredRecords() {
   const tier = document.getElementById('tierSelect').value;
   const year = document.getElementById('yearSelect').value;
   const excludeAnomalies = document.getElementById('excludeAnomalies').checked;
+  const comparing = state.compareArtists.length > 0;
   return state.onsales.filter(r => {
     if (excludeAnomalies && r.anomaly) return false;
     if (r.is_comparable_reference) return false;
     if (tier && r.tier !== tier) return false;
     if (year && String(r.year) !== year) return false;
+    if (comparing) {
+      return state.compareArtists.includes(r.artist);
+    }
     if (q) {
       const hay = `${r.artist} ${r.venue} ${r.city}`.toLowerCase();
       if (!hay.includes(q)) return false;
@@ -230,19 +310,62 @@ function filteredRecords() {
   });
 }
 
+function populateArtistOptions() {
+  const list = document.getElementById('artistList');
+  const artists = [...new Set(state.onsales.filter(r => !r.is_comparable_reference).map(r => r.artist))].sort();
+  list.innerHTML = artists.map(a => `<option value="${a}"></option>`).join('');
+}
+
+function renderChips() {
+  const el = document.getElementById('compareChips');
+  el.innerHTML = state.compareArtists.map((a, i) => `
+    <span class="chip">
+      <span class="dot" style="background:${COMPARE_PALETTE[i % COMPARE_PALETTE.length]}"></span>
+      ${a}
+      <button type="button" data-artist="${a}" aria-label="Remove ${a}">×</button>
+    </span>
+  `).join('');
+  el.querySelectorAll('button').forEach(btn => {
+    btn.addEventListener('click', () => {
+      state.compareArtists = state.compareArtists.filter(a => a !== btn.dataset.artist);
+      renderChips();
+      renderAll();
+    });
+  });
+  const searchBox = document.getElementById('searchBox');
+  const comparing = state.compareArtists.length > 0;
+  searchBox.disabled = comparing;
+  searchBox.placeholder = comparing ? 'Clear comparison above to search all shows…' : 'Or just search/browse all shows…';
+}
+
+function addCompareArtist(name) {
+  const match = [...new Set(state.onsales.map(r => r.artist))].find(
+    a => a.toLowerCase() === name.trim().toLowerCase()
+  );
+  if (!match) return false;
+  if (state.compareArtists.includes(match)) return false;
+  if (state.compareArtists.length >= MAX_COMPARE) return false;
+  state.compareArtists.push(match);
+  renderChips();
+  renderAll();
+  return true;
+}
+
 let chart;
 function renderChart() {
   const metric = document.getElementById('metricSelect').value;
   const hour = document.getElementById('hourSelect').value;
+  const comparing = state.compareArtists.length > 0;
   const rows = filteredRecords()
     .map(r => ({ r, v: metricValue(r, metric, hour) }))
     .filter(x => x.v !== null && x.v !== undefined)
     .sort((a, b) => b.v - a.v)
-    .slice(0, 15);
+    .slice(0, comparing ? 40 : 15);
 
   const ctx = document.getElementById('mainChart').getContext('2d');
   const labels = rows.map(x => `${x.r.artist} — ${x.r.venue}`);
   const data = rows.map(x => x.v);
+  const colors = rows.map(x => comparing ? artistColor(x.r.artist) : '#6ea8fe');
 
   if (chart) chart.destroy();
   chart = new Chart(ctx, {
@@ -252,7 +375,7 @@ function renderChart() {
       datasets: [{
         label: document.getElementById('metricSelect').selectedOptions[0].textContent,
         data,
-        backgroundColor: '#6ea8fe',
+        backgroundColor: colors,
         borderRadius: 4,
       }],
     },
@@ -267,6 +390,64 @@ function renderChart() {
       },
     },
   });
+}
+
+function renderComparisonSummary() {
+  const el = document.getElementById('comparisonSummary');
+  if (state.compareArtists.length === 0) {
+    el.style.display = 'none';
+    el.innerHTML = '';
+    return;
+  }
+  const metric = document.getElementById('metricSelect').value;
+  const hour = document.getElementById('hourSelect').value;
+  const metricLabel = document.getElementById('metricSelect').selectedOptions[0].textContent;
+  const rows = filteredRecords().map(r => ({ r, v: metricValue(r, metric, hour) }));
+
+  const perArtist = state.compareArtists.map((artist, i) => {
+    const shows = rows.filter(x => x.r.artist === artist && x.v !== null && x.v !== undefined);
+    if (!shows.length) {
+      return { artist, color: COMPARE_PALETTE[i % COMPARE_PALETTE.length], count: 0 };
+    }
+    const top = shows.reduce((a, b) => (b.v > a.v ? b : a));
+    const avg = shows.reduce((sum, x) => sum + x.v, 0) / shows.length;
+    return {
+      artist,
+      color: COMPARE_PALETTE[i % COMPARE_PALETTE.length],
+      count: shows.length,
+      peak: top.v,
+      peakShow: `${top.r.venue}${top.r.city ? ', ' + top.r.city : ''}`,
+      avg,
+    };
+  });
+
+  const withData = perArtist.filter(p => p.count > 0).sort((a, b) => b.peak - a.peak);
+
+  let lines = perArtist.map(p => {
+    if (!p.count) {
+      return `<div class="artist-line"><span class="dot" style="background:${p.color}"></span>
+        <span class="artist-name">${p.artist}</span>
+        <span class="artist-stats">no shows match the current filters for ${metricLabel.toLowerCase()}</span></div>`;
+    }
+    return `<div class="artist-line"><span class="dot" style="background:${p.color}"></span>
+      <span class="artist-name">${p.artist}</span>
+      <span class="artist-stats">${p.count} show${p.count === 1 ? '' : 's'} — peak ${fmt(p.peak)} (${p.peakShow}), average ${fmt(Math.round(p.avg))}</span></div>`;
+  }).join('');
+
+  let takeaway = '';
+  if (withData.length >= 2) {
+    const top = withData[0];
+    const bottom = withData[withData.length - 1];
+    const ratio = bottom.peak > 0 ? (top.peak / bottom.peak).toFixed(1) : '—';
+    takeaway = `<div class="takeaway"><strong>${top.artist}</strong> has the highest peak in this comparison at ${fmt(top.peak)}
+      (${top.peakShow})${ratio !== '—' && ratio !== '1.0' ? `, ${ratio}× higher than ${bottom.artist}'s peak of ${fmt(bottom.peak)}` : ''}.
+      Ranking by peak ${metricLabel.toLowerCase()}: ${withData.map(p => p.artist).join(' > ')}.</div>`;
+  } else if (withData.length === 1) {
+    takeaway = `<div class="takeaway">Add another artist to see a head-to-head comparison.</div>`;
+  }
+
+  el.style.display = 'block';
+  el.innerHTML = `<p class="section-title">Comparison summary</p>${lines}${takeaway}`;
 }
 
 function renderTable() {
@@ -320,7 +501,20 @@ function renderAll() {
   try { renderChart(); } catch (e) { console.error('renderChart failed:', e); }
   try { renderTable(); } catch (e) { console.error('renderTable failed:', e); }
   try { renderInsights(); } catch (e) { console.error('renderInsights failed:', e); }
+  try { renderComparisonSummary(); } catch (e) { console.error('renderComparisonSummary failed:', e); }
 }
+
+const compareInput = document.getElementById('compareInput');
+compareInput.addEventListener('keydown', (e) => {
+  if (e.key !== 'Enter') return;
+  e.preventDefault();
+  const ok = addCompareArtist(compareInput.value);
+  if (ok) compareInput.value = '';
+});
+compareInput.addEventListener('change', () => {
+  const ok = addCompareArtist(compareInput.value);
+  if (ok) compareInput.value = '';
+});
 
 document.querySelectorAll('#dataTable th').forEach(th => {
   th.addEventListener('click', () => {
@@ -352,6 +546,7 @@ async function loadData() {
 
   populateHourOptions();
   populateYearOptions();
+  populateArtistOptions();
 
   const lastSyncTimes = state.onsales.map(r => r.last_synced).filter(Boolean).sort();
   const latest = state.insights?.generated_at || lastSyncTimes[lastSyncTimes.length - 1];
