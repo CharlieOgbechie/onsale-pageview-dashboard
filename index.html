@@ -4,7 +4,7 @@
 <meta charset="UTF-8" />
 <title>Onsale Page View Dashboard</title>
 <meta name="viewport" content="width=device-width, initial-scale=1" />
-<script src="https://cdnjs.cloudflare.com/ajax/libs/Chart.js/4.4.4/chart.umd.min.js"></script>
+<script src="https://cdnjs.cloudflare.com/ajax/libs/Chart.js/4.5.0/chart.umd.min.js"></script>
 <style>
   :root {
     --bg: #0f1115;
@@ -315,9 +315,11 @@ function renderInsights() {
 }
 
 function renderAll() {
-  renderChart();
-  renderTable();
-  renderInsights();
+  // Each render step runs independently so a failure in one (e.g. the
+  // charting library failing to load) doesn't blank out the rest of the page.
+  try { renderChart(); } catch (e) { console.error('renderChart failed:', e); }
+  try { renderTable(); } catch (e) { console.error('renderTable failed:', e); }
+  try { renderInsights(); } catch (e) { console.error('renderInsights failed:', e); }
 }
 
 document.querySelectorAll('#dataTable th').forEach(th => {
