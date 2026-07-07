@@ -256,6 +256,15 @@
     cursor: pointer;
   }
   .pagination button:disabled { opacity: 0.4; cursor: default; }
+  .btn-secondary {
+    background: var(--panel-2);
+    border: 1px solid var(--border);
+    color: var(--text);
+    border-radius: 6px;
+    padding: 7px 14px;
+    font-size: 13px;
+    cursor: pointer;
+  }
   .tour-row { cursor: pointer; }
   .tour-row:hover td { background: var(--panel-2); }
   .expand-toggle { display: inline-block; width: 14px; color: var(--muted); }
@@ -337,6 +346,9 @@
   <button type="button" class="nav-btn" data-tab="tours">
     <span class="nav-icon">📋</span> All Tours
   </button>
+  <button type="button" class="nav-btn" data-tab="venues">
+    <span class="nav-icon">🏟️</span> Venues &amp; Countries
+  </button>
   <button type="button" class="nav-btn" data-tab="commentary">
     <span class="nav-icon">💬</span> Page View Commentary
   </button>
@@ -386,7 +398,7 @@
         <input type="checkbox" id="excludeAnomalies" checked style="width:auto;" /> exclude anomalies
       </label>
     </div>
-    <p class="compare-hint" style="margin:10px 0 0;">These filters apply on both the Compare Shows and All Tours tabs.</p>
+    <p class="compare-hint" style="margin:10px 0 0;">These filters apply on the Compare Shows and All Tours tabs. Tier/year/venue-type/anomaly filters also narrow the Venues &amp; Countries tab — the artist compare picker above and free-text search don't, since that tab is for browsing by venue/country instead.</p>
   </div>
 
   <section id="tab-compare" class="tab-panel">
@@ -408,6 +420,37 @@
         <tbody></tbody>
       </table>
       <div id="tablePagination" class="pagination"></div>
+    </div>
+  </section>
+
+  <section id="tab-venues" class="tab-panel" style="display:none;">
+    <div class="panel">
+      <p class="section-title">Look up a venue or country</p>
+      <p class="compare-hint" style="margin:-6px 0 12px;">Type a venue (e.g. "Strawberry Arena") or a country, and press Enter to see every artist/show on file there with their figures.</p>
+      <div class="compare-picker">
+        <span class="compare-hint">Venue or country:</span>
+        <input list="venueLookupList" id="venueLookupInput" placeholder="Type a venue or country name and press Enter…" />
+        <datalist id="venueLookupList"></datalist>
+        <button type="button" id="venueLookupClear" class="btn-secondary" style="display:none;">Clear</button>
+      </div>
+      <div id="venueLookupResult"></div>
+    </div>
+
+    <div class="panel">
+      <p class="section-title">Average comparison — venues &amp; countries</p>
+      <div class="view-toggle">
+        <button type="button" id="viewVenueBtn" class="active">By venue</button>
+        <button type="button" id="viewCountryBtn">By country</button>
+      </div>
+      <div style="display:flex; align-items:baseline; justify-content:space-between;">
+        <p class="section-title" id="venueTableTitle" style="margin:0;">Venue averages</p>
+        <span class="compare-hint" id="venueTableCount"></span>
+      </div>
+      <table id="venueTable">
+        <thead><tr></tr></thead>
+        <tbody></tbody>
+      </table>
+      <div id="venueTablePagination" class="pagination"></div>
     </div>
   </section>
 
@@ -444,8 +487,13 @@ const state = {
   venueMap: {}, // lowercase venue name -> { capacity, venue_type }
   page: 1,
   expandedTours: new Set(), // tour keys currently drilled-into in the "By tour" table
+  venueViewMode: 'venue', // 'venue' | 'country' — the Venues & Countries averages grid
+  venuePage: 1,
+  venueSort: { key: 'avg', dir: 'desc' },
+  expandedVenues: new Set(), // venue/country keys currently drilled-into in the averages grid
 };
 let lastRenderedTours = []; // current page's tour rows, indexed for the delegated click handler
+let lastRenderedVenueRows = []; // current page's venue/country rows, indexed for the delegated click handler
 const COMPARE_PALETTE = ['#6ea8fe', '#f2b84b', '#4fd18b', '#f27272', '#c792ea'];
 const MAX_COMPARE = 5;
 const PACE_AHEAD_THRESHOLD = 1.15; // 15% above venue average
@@ -614,6 +662,166 @@ function aggregateTours(rows, metric, hour) {
       shows: valued, // per-show breakdown, used by the click-to-expand drill-down
     };
   });
+}
+
+// --- Venues & Countries tab: a venue-centric/country-centric lens instead of
+// artist-centric. Deliberately ignores the artist compare picker and free-text
+// search (this tab is for browsing by venue/country instead), but still
+// respects tier/year/venue-type/exclude-anomalies since those are general
+// dataset filters. ---
+function baseRecordsForVenues() {
+  const tier = document.getElementById('tierSelect').value;
+  const year = document.getElementById('yearSelect').value;
+  const venueType = document.getElementById('venueTypeSelect').value;
+  const excludeAnomalies = document.getElementById('excludeAnomalies').checked;
+  return state.onsales.filter(r => {
+    if (excludeAnomalies && r.anomaly) return false;
+    if (r.is_comparable_reference) return false;
+    if (tier && r.tier !== tier) return false;
+    if (year && String(r.year) !== year) return false;
+    if (venueType && getVenueType(r) !== venueType) return false;
+    return true;
+  });
+}
+
+function aggregateByVenue(rows, metric, hour) {
+  const groups = new Map();
+  rows.forEach(r => {
+    const key = r.venue || 'Unknown venue';
+    if (!groups.has(key)) groups.set(key, { key, venue: r.venue || 'Unknown venue', city: r.city, country: r.country, shows: [] });
+    groups.get(key).shows.push(r);
+  });
+  return [...groups.values()].map(g => {
+    const valued = g.shows
+      .map(r => ({ r, v: metricValue(r, metric, hour), pacing: pacingFor(r, metric, hour) }))
+      .filter(x => x.v !== null && x.v !== undefined);
+    const artists = [...new Set(g.shows.map(r => r.artist))];
+    const total = valued.reduce((s, x) => s + x.v, 0);
+    const avg = valued.length ? total / valued.length : null;
+    const info = state.venueMap[g.venue.toLowerCase().trim()] || {};
+    return {
+      key: g.key,
+      venue: g.venue,
+      country: g.country,
+      venueType: info.venue_type || 'unknown',
+      capacity: info.capacity || null,
+      showCount: g.shows.length,
+      artistCount: artists.length,
+      total,
+      avg,
+      avgPresale: avgOf(g.shows.map(r => r.presale_peak_queue)),
+      avgOnsale: avgOf(g.shows.map(r => r.onsale_peak_queue)),
+      shows: valued,
+    };
+  });
+}
+
+function aggregateByCountry(rows, metric, hour) {
+  const groups = new Map();
+  rows.forEach(r => {
+    const key = r.country || 'Unknown country';
+    if (!groups.has(key)) groups.set(key, { key, shows: [] });
+    groups.get(key).shows.push(r);
+  });
+  return [...groups.values()].map(g => {
+    const valued = g.shows
+      .map(r => ({ r, v: metricValue(r, metric, hour), pacing: pacingFor(r, metric, hour) }))
+      .filter(x => x.v !== null && x.v !== undefined);
+    const artists = [...new Set(g.shows.map(r => r.artist))];
+    const venues = [...new Set(g.shows.map(r => r.venue))];
+    const total = valued.reduce((s, x) => s + x.v, 0);
+    const avg = valued.length ? total / valued.length : null;
+    return {
+      key: g.key,
+      country: g.key,
+      venueCount: venues.length,
+      showCount: g.shows.length,
+      artistCount: artists.length,
+      total,
+      avg,
+      avgPresale: avgOf(g.shows.map(r => r.presale_peak_queue)),
+      avgOnsale: avgOf(g.shows.map(r => r.onsale_peak_queue)),
+      shows: valued,
+    };
+  });
+}
+
+function populateVenueLookupOptions() {
+  const list = document.getElementById('venueLookupList');
+  const rows = state.onsales.filter(r => !r.is_comparable_reference);
+  const venues = [...new Set(rows.map(r => r.venue).filter(Boolean))];
+  const countries = [...new Set(rows.map(r => r.country).filter(Boolean))];
+  const options = [...venues, ...countries].sort();
+  list.innerHTML = options.map(v => `<option value="${v}"></option>`).join('');
+}
+
+function renderVenueLookupResult(query) {
+  const el = document.getElementById('venueLookupResult');
+  const clearBtn = document.getElementById('venueLookupClear');
+  const q = (query || '').trim();
+  if (!q) {
+    el.innerHTML = '';
+    clearBtn.style.display = 'none';
+    return;
+  }
+  clearBtn.style.display = 'inline-block';
+
+  const metric = document.getElementById('metricSelect').value;
+  const hour = document.getElementById('hourSelect').value;
+  const metricLabel = document.getElementById('metricSelect').selectedOptions[0].textContent;
+  const rows = baseRecordsForVenues();
+  const qLower = q.toLowerCase();
+
+  const venueMatches = rows.filter(r => (r.venue || '').toLowerCase() === qLower);
+  const countryMatches = venueMatches.length ? [] : rows.filter(r => (r.country || '').toLowerCase() === qLower);
+  const matches = venueMatches.length ? venueMatches : countryMatches;
+  const isCountry = !venueMatches.length && countryMatches.length > 0;
+
+  if (!matches.length) {
+    el.innerHTML = `<div class="empty">No shows on file for "${q}" — check spelling, or it may not be in the dataset yet (or is excluded by the tier/year/venue-type filters above).</div>`;
+    return;
+  }
+
+  const valued = matches.map(r => ({ r, v: metricValue(r, metric, hour), pacing: pacingFor(r, metric, hour) }));
+  const withVals = valued.filter(x => x.v !== null && x.v !== undefined);
+  const artists = [...new Set(matches.map(r => r.artist))];
+  const venues = [...new Set(matches.map(r => r.venue))];
+  const total = withVals.reduce((s, x) => s + x.v, 0);
+  const avg = withVals.length ? total / withVals.length : null;
+  const info = !isCountry ? (state.venueMap[qLower] || {}) : null;
+
+  const statCards = `
+    <div class="commentary-highlight-stats">
+      <div class="commentary-stat"><span class="num">${matches.length}</span><span class="lbl">show${matches.length === 1 ? '' : 's'} on file</span></div>
+      <div class="commentary-stat"><span class="num">${artists.length}</span><span class="lbl">artist${artists.length === 1 ? '' : 's'}</span></div>
+      ${isCountry ? `<div class="commentary-stat"><span class="num">${venues.length}</span><span class="lbl">venue${venues.length === 1 ? '' : 's'}</span></div>` : ''}
+      <div class="commentary-stat"><span class="num">${fmt(avg !== null ? Math.round(avg) : null)}</span><span class="lbl">avg ${metricLabel.toLowerCase()}</span></div>
+      <div class="commentary-stat"><span class="num">${fmt(total ? Math.round(total) : null)}</span><span class="lbl">total ${metricLabel.toLowerCase()}</span></div>
+      ${info && info.venue_type ? `<div class="commentary-stat"><span class="num" style="font-size:13px;">${info.venue_type}${info.capacity ? ` · ${fmt(info.capacity)} cap` : ''}</span><span class="lbl">venue type</span></div>` : ''}
+    </div>
+  `;
+
+  const sorted = valued.slice().sort((a, b) => (b.v ?? -Infinity) - (a.v ?? -Infinity));
+  const tableRows = sorted.map(x => `
+    <tr>
+      <td>${x.r.artist}${x.r.anomaly ? ' <span class="badge anomaly-badge">anomaly</span>' : ''}</td>
+      ${isCountry ? `<td>${x.r.venue}</td>` : ''}
+      <td>${x.r.date || '—'}</td>
+      <td>${fmt(x.v)}</td>
+      <td class="${x.pacing ? x.pacing.cls : ''}" title="${x.pacing ? x.pacing.label : ''}">${x.pacing ? x.pacing.symbol : '—'}</td>
+    </tr>
+  `).join('');
+
+  el.innerHTML = `
+    <div class="commentary-highlight">
+      <p class="section-title">${isCountry ? 'Country' : 'Venue'} — ${isCountry ? matches[0].country : matches[0].venue}</p>
+      ${statCards}
+      <table>
+        <thead><tr><th>Artist</th>${isCountry ? '<th>Venue</th>' : ''}<th>Date</th><th>${metricLabel}</th><th>Pacing</th></tr></thead>
+        <tbody>${tableRows}</tbody>
+      </table>
+    </div>
+  `;
 }
 
 function populateArtistOptions() {
@@ -1166,6 +1374,167 @@ function renderTable() {
   else renderShowTable();
 }
 
+// --------------------------------------------------------------------------
+// Venues & Countries averages grid — parallel to the All Tours table above,
+// but its own pagination/sort/expand state since it's a separate table.
+// --------------------------------------------------------------------------
+
+function bindVenueSortHeaders() {
+  document.querySelectorAll('#venueTable th[data-vkey]').forEach(th => {
+    th.addEventListener('click', () => {
+      const key = th.dataset.vkey;
+      if (state.venueSort.key === key) state.venueSort.dir = state.venueSort.dir === 'asc' ? 'desc' : 'asc';
+      else state.venueSort = { key, dir: 'desc' };
+      renderVenueTable();
+    });
+  });
+}
+
+function venuePaginate(rows) {
+  const total = rows.length;
+  const totalPages = Math.max(1, Math.ceil(total / PAGE_SIZE));
+  if (state.venuePage > totalPages) state.venuePage = totalPages;
+  if (state.venuePage < 1) state.venuePage = 1;
+  const start = (state.venuePage - 1) * PAGE_SIZE;
+  return { pageRows: rows.slice(start, start + PAGE_SIZE), total, totalPages, start };
+}
+
+function renderVenuePaginationControls(total, totalPages, start, label) {
+  document.getElementById('venueTableCount').textContent = total
+    ? `Showing ${start + 1}-${Math.min(start + PAGE_SIZE, total)} of ${total} ${label}`
+    : '';
+  const el = document.getElementById('venueTablePagination');
+  if (totalPages <= 1) { el.innerHTML = ''; return; }
+  el.innerHTML = `
+    <button id="venuePagePrev" ${state.venuePage <= 1 ? 'disabled' : ''}>‹ Prev</button>
+    <span>Page ${state.venuePage} of ${totalPages}</span>
+    <button id="venuePageNext" ${state.venuePage >= totalPages ? 'disabled' : ''}>Next ›</button>
+  `;
+  document.getElementById('venuePagePrev').addEventListener('click', () => { state.venuePage--; renderVenueTable(); });
+  document.getElementById('venuePageNext').addEventListener('click', () => { state.venuePage++; renderVenueTable(); });
+}
+
+function buildVenueDetailRow(item, colspan) {
+  const isCountryMode = state.venueViewMode === 'country';
+  const sorted = item.shows.slice().sort((a, b) => b.v - a.v);
+  const rows = sorted.map(x => `
+    <tr>
+      <td>${x.r.artist}</td>
+      ${isCountryMode ? `<td>${x.r.venue}</td>` : ''}
+      <td>${x.r.city || ''}</td>
+      <td>${x.r.date || '—'}</td>
+      <td>${fmt(x.v)}</td>
+      <td class="${x.pacing ? x.pacing.cls : ''}" title="${x.pacing ? x.pacing.label : ''}">${x.pacing ? `${x.pacing.symbol} ${x.pacing.label}` : '—'}</td>
+    </tr>
+  `).join('');
+  return `
+    <tr class="tour-detail-row">
+      <td colspan="${colspan}">
+        <table class="detail-table">
+          <thead><tr><th>Artist</th>${isCountryMode ? '<th>Venue</th>' : ''}<th>City</th><th>Date</th><th>Value</th><th>Pacing</th></tr></thead>
+          <tbody>${rows || '<tr><td colspan="6" class="empty">No shows with a value for this metric.</td></tr>'}</tbody>
+        </table>
+      </td>
+    </tr>`;
+}
+
+function renderVenueTable() {
+  const metric = document.getElementById('metricSelect').value;
+  const hour = document.getElementById('hourSelect').value;
+  const metricLabel = document.getElementById('metricSelect').selectedOptions[0].textContent;
+  const base = baseRecordsForVenues();
+
+  if (state.venueViewMode === 'venue') {
+    document.getElementById('venueTableTitle').textContent = 'Venue averages';
+    document.querySelector('#venueTable thead tr').innerHTML = `
+      <th data-vkey="venue">Venue</th>
+      <th data-vkey="country">Country</th>
+      <th>Type</th>
+      <th data-vkey="showCount">Shows</th>
+      <th data-vkey="artistCount">Artists</th>
+      <th data-vkey="avg">Avg ${metricLabel}</th>
+      <th data-vkey="avgPresale">Avg presale Q</th>
+      <th data-vkey="avgOnsale">Avg onsale Q</th>
+    `;
+    bindVenueSortHeaders();
+
+    let rows = aggregateByVenue(base, metric, hour);
+    const { key, dir } = state.venueSort;
+    const sortKey = ['venue', 'country', 'showCount', 'artistCount', 'avg', 'avgPresale', 'avgOnsale'].includes(key) ? key : 'avg';
+    rows = sortRows(rows, sortKey, sortKey === key ? dir : 'desc');
+
+    const { pageRows, total, totalPages, start } = venuePaginate(rows);
+    lastRenderedVenueRows = pageRows;
+
+    const tbody = document.querySelector('#venueTable tbody');
+    tbody.innerHTML = pageRows.map((v, i) => {
+      const expanded = state.expandedVenues.has(v.key);
+      const mainRow = `
+        <tr class="tour-row" data-venue-index="${i}">
+          <td><span class="expand-toggle">${expanded ? '▾' : '▸'}</span> ${v.venue}</td>
+          <td>${v.country || '—'}</td>
+          <td>${v.venueType !== 'unknown' ? v.venueType : '—'}</td>
+          <td>${v.showCount}</td>
+          <td>${v.artistCount}</td>
+          <td>${fmt(v.avg !== null ? Math.round(v.avg) : null)}</td>
+          <td>${fmt(v.avgPresale !== null ? Math.round(v.avgPresale) : null)}</td>
+          <td>${fmt(v.avgOnsale !== null ? Math.round(v.avgOnsale) : null)}</td>
+        </tr>`;
+      return mainRow + (expanded ? buildVenueDetailRow(v, 8) : '');
+    }).join('') || '<tr><td colspan="8" class="empty">No venues match these filters.</td></tr>';
+
+    renderVenuePaginationControls(total, totalPages, start, 'venues');
+  } else {
+    document.getElementById('venueTableTitle').textContent = 'Country averages';
+    document.querySelector('#venueTable thead tr').innerHTML = `
+      <th data-vkey="country">Country</th>
+      <th data-vkey="venueCount">Venues</th>
+      <th data-vkey="showCount">Shows</th>
+      <th data-vkey="artistCount">Artists</th>
+      <th data-vkey="avg">Avg ${metricLabel}</th>
+      <th data-vkey="avgPresale">Avg presale Q</th>
+      <th data-vkey="avgOnsale">Avg onsale Q</th>
+    `;
+    bindVenueSortHeaders();
+
+    let rows = aggregateByCountry(base, metric, hour);
+    const { key, dir } = state.venueSort;
+    const sortKey = ['country', 'venueCount', 'showCount', 'artistCount', 'avg', 'avgPresale', 'avgOnsale'].includes(key) ? key : 'avg';
+    rows = sortRows(rows, sortKey, sortKey === key ? dir : 'desc');
+
+    const { pageRows, total, totalPages, start } = venuePaginate(rows);
+    lastRenderedVenueRows = pageRows;
+
+    const tbody = document.querySelector('#venueTable tbody');
+    tbody.innerHTML = pageRows.map((c, i) => {
+      const expanded = state.expandedVenues.has(c.key);
+      const mainRow = `
+        <tr class="tour-row" data-venue-index="${i}">
+          <td><span class="expand-toggle">${expanded ? '▾' : '▸'}</span> ${c.country}</td>
+          <td>${c.venueCount}</td>
+          <td>${c.showCount}</td>
+          <td>${c.artistCount}</td>
+          <td>${fmt(c.avg !== null ? Math.round(c.avg) : null)}</td>
+          <td>${fmt(c.avgPresale !== null ? Math.round(c.avgPresale) : null)}</td>
+          <td>${fmt(c.avgOnsale !== null ? Math.round(c.avgOnsale) : null)}</td>
+        </tr>`;
+      return mainRow + (expanded ? buildVenueDetailRow(c, 7) : '');
+    }).join('') || '<tr><td colspan="7" class="empty">No countries match these filters.</td></tr>';
+
+    renderVenuePaginationControls(total, totalPages, start, 'countries');
+  }
+}
+
+function setVenueViewMode(mode) {
+  state.venueViewMode = mode;
+  state.venuePage = 1;
+  state.expandedVenues.clear();
+  document.getElementById('viewVenueBtn').classList.toggle('active', mode === 'venue');
+  document.getElementById('viewCountryBtn').classList.toggle('active', mode === 'country');
+  state.venueSort = { key: 'avg', dir: 'desc' };
+  renderVenueTable();
+}
+
 function renderInsights() {
   const el = document.getElementById('insights');
   const selected = state.compareArtists;
@@ -1211,6 +1580,8 @@ function renderAll() {
   try { renderTable(); } catch (e) { console.error('renderTable failed:', e); }
   try { renderInsights(); } catch (e) { console.error('renderInsights failed:', e); }
   try { renderComparisonSummary(); } catch (e) { console.error('renderComparisonSummary failed:', e); }
+  try { renderVenueTable(); } catch (e) { console.error('renderVenueTable failed:', e); }
+  try { renderVenueLookupResult(document.getElementById('venueLookupInput').value); } catch (e) { console.error('renderVenueLookupResult failed:', e); }
 }
 
 const compareInput = document.getElementById('compareInput');
@@ -1226,7 +1597,11 @@ compareInput.addEventListener('change', () => {
 });
 
 ['searchBox', 'metricSelect', 'hourSelect', 'tierSelect', 'yearSelect', 'venueTypeSelect', 'excludeAnomalies'].forEach(id => {
-  document.getElementById(id).addEventListener('input', () => { state.page = 1; state.expandedTours.clear(); renderAll(); });
+  document.getElementById(id).addEventListener('input', () => {
+    state.page = 1; state.expandedTours.clear();
+    state.venuePage = 1; state.expandedVenues.clear();
+    renderAll();
+  });
 });
 
 function setViewMode(mode) {
@@ -1251,6 +1626,31 @@ document.querySelector('#dataTable tbody').addEventListener('click', (e) => {
 });
 document.getElementById('viewShowBtn').addEventListener('click', () => setViewMode('show'));
 document.getElementById('viewTourBtn').addEventListener('click', () => setViewMode('tour'));
+
+document.querySelector('#venueTable tbody').addEventListener('click', (e) => {
+  const row = e.target.closest('tr.tour-row');
+  if (!row) return;
+  const idx = Number(row.dataset.venueIndex);
+  const item = lastRenderedVenueRows[idx];
+  if (!item) return;
+  if (state.expandedVenues.has(item.key)) state.expandedVenues.delete(item.key);
+  else state.expandedVenues.add(item.key);
+  renderVenueTable();
+});
+document.getElementById('viewVenueBtn').addEventListener('click', () => setVenueViewMode('venue'));
+document.getElementById('viewCountryBtn').addEventListener('click', () => setVenueViewMode('country'));
+
+const venueLookupInput = document.getElementById('venueLookupInput');
+venueLookupInput.addEventListener('keydown', (e) => {
+  if (e.key !== 'Enter') return;
+  e.preventDefault();
+  renderVenueLookupResult(venueLookupInput.value);
+});
+venueLookupInput.addEventListener('change', () => renderVenueLookupResult(venueLookupInput.value));
+document.getElementById('venueLookupClear').addEventListener('click', () => {
+  venueLookupInput.value = '';
+  renderVenueLookupResult('');
+});
 
 // --------------------------------------------------------------------------
 // Top nav: switches which section is visible. Filters stay in a shared bar
@@ -1297,6 +1697,7 @@ async function loadData() {
   populateHourOptions();
   populateYearOptions();
   populateArtistOptions();
+  populateVenueLookupOptions();
 
   const lastSyncTimes = state.onsales.map(r => r.last_synced).filter(Boolean).sort();
   const latest = state.insights?.generated_at || lastSyncTimes[lastSyncTimes.length - 1];
