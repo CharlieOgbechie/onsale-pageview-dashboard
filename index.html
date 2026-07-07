@@ -891,7 +891,7 @@ function renderChart() {
       .filter(x => x.v !== null && x.v !== undefined)
       .sort((a, b) => b.v - a.v)
       .slice(0, comparing ? 40 : 15);
-    labels = rows.map(x => `${x.r.artist} — ${x.r.venue}`);
+    labels = rows.map(x => `${x.r.artist} — ${x.r.venue}${x.r.date ? ` (${x.r.date})` : ''}`);
     data = rows.map(x => x.v);
     colors = rows.map(x => comparing ? artistColor(x.r.artist) : '#6ea8fe');
     axisLabel = metricLabel;
