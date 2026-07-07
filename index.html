@@ -168,6 +168,30 @@
     border-radius: 6px;
     font-size: 13px;
   }
+  .commentary-highlight {
+    border: 1px solid var(--accent);
+    background: rgba(110, 168, 254, 0.06);
+    border-radius: 8px;
+    padding: 16px 18px;
+    margin-bottom: 20px;
+  }
+  .commentary-highlight .section-title { color: var(--accent); margin-bottom: 10px; }
+  .commentary-highlight-stats {
+    display: flex;
+    flex-wrap: wrap;
+    gap: 10px;
+    margin: 0 0 12px;
+  }
+  .commentary-stat {
+    background: var(--panel-2);
+    border: 1px solid var(--border);
+    border-radius: 6px;
+    padding: 8px 14px;
+    font-size: 12.5px;
+    min-width: 90px;
+  }
+  .commentary-stat .num { font-size: 18px; font-weight: 700; display: block; line-height: 1.3; }
+  .commentary-stat .lbl { color: var(--muted); }
   .ask-box { display: flex; gap: 8px; margin-bottom: 16px; }
   .ask-box input { flex: 1; }
   .ask-box button {
@@ -691,16 +715,10 @@ function renderChart() {
   });
 }
 
-function renderComparisonSummary() {
-  const el = document.getElementById('comparisonSummary');
-  if (state.compareArtists.length === 0) {
-    el.style.display = 'none';
-    el.innerHTML = '';
-    return;
-  }
-  const metric = document.getElementById('metricSelect').value;
-  const hour = document.getElementById('hourSelect').value;
-  const metricLabel = document.getElementById('metricSelect').selectedOptions[0].textContent;
+// --- Shared comparison computation, used by both the Compare Shows summary
+// panel and the Page View Commentary tab's comparative-analysis block, so the
+// two stay consistent instead of drifting apart with duplicated logic. ---
+function computeComparisonData(selected, metric, hour) {
   const rows = filteredRecords().map(r => ({ r, v: metricValue(r, metric, hour) }));
 
   // Venue match first: the most scientific comparison basis is different
@@ -709,7 +727,7 @@ function renderComparisonSummary() {
   // artist's overall peak/average (a weaker, artist-only basis).
   const venueGroups = new Map();
   rows.forEach(x => {
-    if (!state.compareArtists.includes(x.r.artist)) return;
+    if (!selected.includes(x.r.artist)) return;
     if (x.v === null || x.v === undefined) return;
     if (!venueGroups.has(x.r.venue)) venueGroups.set(x.r.venue, []);
     venueGroups.get(x.r.venue).push(x);
@@ -718,25 +736,18 @@ function renderComparisonSummary() {
     .filter(([, xs]) => new Set(xs.map(x => x.r.artist)).size >= 2)
     .sort((a, b) => b[1].length - a[1].length);
 
-  let venueBlock = '';
-  if (sharedVenues.length) {
-    venueBlock = `<div class="venue-match-note">Strongest comparison basis — same venue, different artists (city/capacity held constant):</div>` +
-      sharedVenues.map(([venue, xs]) => {
-        const sorted = xs.slice().sort((a, b) => b.v - a.v);
-        const items = sorted.map(x => `<span style="color:${artistColor(x.r.artist)}; font-weight:600;">${x.r.artist}</span> ${fmt(x.v)}`).join(' vs. ');
-        const top = sorted[0], bottom = sorted[sorted.length - 1];
-        const ratio = bottom.v > 0 ? (top.v / bottom.v).toFixed(1) : null;
-        const single = sorted.length < 2 || sorted.every(x => x.v === sorted[0].v);
-        return `<div class="venue-match-row"><strong>${venue}</strong> — ${items}${ratio && ratio !== '1.0' ? ` (${top.r.artist} ${ratio}× ${bottom.r.artist})` : ''}${xs.length <= 2 ? ' <span style="color:var(--muted);font-size:11px;">(small sample — 2 shows on file at this venue)</span>' : ''}</div>`;
-      }).join('');
-  } else if (state.compareArtists.length >= 2) {
-    venueBlock = `<div class="venue-match-note">No shared venues among these artists yet, so this falls back to a weaker basis — each artist's overall peak/average across all their own shows, rather than a same-venue matchup.</div>`;
-  }
-
-  const perArtist = state.compareArtists.map((artist, i) => {
+  const perArtist = selected.map((artist, i) => {
     const shows = rows.filter(x => x.r.artist === artist && x.v !== null && x.v !== undefined);
+    const paceCounts = { ahead: 0, below: 0, onpar: 0, unknown: 0 };
+    filteredRecords().filter(r => r.artist === artist).forEach(r => {
+      const p = pacingFor(r, metric, hour);
+      if (!p || p.cls === 'pace-unknown') paceCounts.unknown++;
+      else if (p.cls === 'pace-ahead') paceCounts.ahead++;
+      else if (p.cls === 'pace-below') paceCounts.below++;
+      else paceCounts.onpar++;
+    });
     if (!shows.length) {
-      return { artist, color: COMPARE_PALETTE[i % COMPARE_PALETTE.length], count: 0 };
+      return { artist, color: COMPARE_PALETTE[i % COMPARE_PALETTE.length], count: 0, paceCounts };
     }
     const top = shows.reduce((a, b) => (b.v > a.v ? b : a));
     const avg = shows.reduce((sum, x) => sum + x.v, 0) / shows.length;
@@ -747,10 +758,40 @@ function renderComparisonSummary() {
       peak: top.v,
       peakShow: `${top.r.venue}${top.r.city ? ', ' + top.r.city : ''}`,
       avg,
+      paceCounts,
     };
   });
 
   const withData = perArtist.filter(p => p.count > 0).sort((a, b) => b.peak - a.peak);
+
+  return { sharedVenues, perArtist, withData };
+}
+
+function renderComparisonSummary() {
+  const el = document.getElementById('comparisonSummary');
+  if (state.compareArtists.length === 0) {
+    el.style.display = 'none';
+    el.innerHTML = '';
+    return;
+  }
+  const metric = document.getElementById('metricSelect').value;
+  const hour = document.getElementById('hourSelect').value;
+  const metricLabel = document.getElementById('metricSelect').selectedOptions[0].textContent;
+  const { sharedVenues, perArtist, withData } = computeComparisonData(state.compareArtists, metric, hour);
+
+  let venueBlock = '';
+  if (sharedVenues.length) {
+    venueBlock = `<div class="venue-match-note">Strongest comparison basis — same venue, different artists (city/capacity held constant):</div>` +
+      sharedVenues.map(([venue, xs]) => {
+        const sorted = xs.slice().sort((a, b) => b.v - a.v);
+        const items = sorted.map(x => `<span style="color:${artistColor(x.r.artist)}; font-weight:600;">${x.r.artist}</span> ${fmt(x.v)}`).join(' vs. ');
+        const top = sorted[0], bottom = sorted[sorted.length - 1];
+        const ratio = bottom.v > 0 ? (top.v / bottom.v).toFixed(1) : null;
+        return `<div class="venue-match-row"><strong>${venue}</strong> — ${items}${ratio && ratio !== '1.0' ? ` (${top.r.artist} ${ratio}× ${bottom.r.artist})` : ''}${xs.length <= 2 ? ' <span style="color:var(--muted);font-size:11px;">(small sample — 2 shows on file at this venue)</span>' : ''}</div>`;
+      }).join('');
+  } else if (state.compareArtists.length >= 2) {
+    venueBlock = `<div class="venue-match-note">No shared venues among these artists yet, so this falls back to a weaker basis — each artist's overall peak/average across all their own shows, rather than a same-venue matchup.</div>`;
+  }
 
   let lines = perArtist.map(p => {
     if (!p.count) {
@@ -770,13 +811,178 @@ function renderComparisonSummary() {
     const ratio = bottom.peak > 0 ? (top.peak / bottom.peak).toFixed(1) : '—';
     takeaway = `<div class="takeaway"><strong>${top.artist}</strong> has the highest peak in this comparison at ${fmt(top.peak)}
       (${top.peakShow})${ratio !== '—' && ratio !== '1.0' ? `, ${ratio}× higher than ${bottom.artist}'s peak of ${fmt(bottom.peak)}` : ''}.
-      Ranking by peak ${metricLabel.toLowerCase()}: ${withData.map(p => p.artist).join(' > ')}.</div>`;
+      Ranking by peak ${metricLabel.toLowerCase()}: ${withData.map(p => p.artist).join(' > ')}.
+      See the Page View Commentary tab for a fuller comparative write-up.</div>`;
   } else if (withData.length === 1) {
     takeaway = `<div class="takeaway">Add another artist to see a head-to-head comparison.</div>`;
   }
 
   el.style.display = 'block';
   el.innerHTML = `<p class="section-title">Comparison summary</p>${venueBlock}${lines}${takeaway}`;
+}
+
+// --- Page View Commentary: selection-aware rendering. Reuses the same
+// pacing/venue-match computations above so what's said here always lines up
+// with what the Compare Shows chart/table show. ---
+
+function insightBlockHTML(i) {
+  return `
+    <div class="insight" ${i.category === 'early_read' ? 'style="border-left-color: var(--accent-2);"' : ''}>
+      ${i.category === 'early_read' ? '<span class="badge" style="border-color: var(--accent-2); color: var(--accent-2); margin-bottom:6px; display:inline-block;">Early read · 12–24h</span><br>' : ''}
+      <h4>${i.headline}</h4>
+      <p>${i.detail}</p>
+    </div>
+  `;
+}
+
+// Which artists a precomputed insight is actually about. Prefers resolving
+// related_ids against the real records (reliable), and falls back to a plain
+// text match on headline/detail for insights that don't carry related_ids.
+function artistsInInsight(insight) {
+  const fromIds = new Set();
+  (insight.related_ids || []).forEach(id => {
+    const rec = state.onsales.find(r => r.id === id);
+    if (rec) fromIds.add(rec.artist);
+  });
+  if (fromIds.size) return [...fromIds];
+  const text = `${insight.headline || ''} ${insight.detail || ''}`.toLowerCase();
+  const allArtists = [...new Set(state.onsales.map(r => r.artist))];
+  return allArtists.filter(a => text.includes(a.toLowerCase()));
+}
+
+function insightsMentioning(selected) {
+  if (!state.insights || !state.insights.insights) return [];
+  const wanted = selected.map(a => a.toLowerCase());
+  return state.insights.insights.filter(i =>
+    artistsInInsight(i).some(a => wanted.includes(a.toLowerCase()))
+  );
+}
+
+// Insights that name TWO OR MORE of the currently-selected artists — i.e.
+// genuinely comparative precomputed commentary, not just "mentions one of them".
+function insightsMentioningMultiple(selected) {
+  if (!state.insights || !state.insights.insights) return [];
+  const wanted = selected.map(a => a.toLowerCase());
+  return state.insights.insights.filter(i => {
+    const hit = new Set(artistsInInsight(i).map(a => a.toLowerCase()).filter(a => wanted.includes(a)));
+    return hit.size >= 2;
+  });
+}
+
+function renderArtistSpotlight(artist) {
+  const metric = document.getElementById('metricSelect').value;
+  const hour = document.getElementById('hourSelect').value;
+  const metricLabel = document.getElementById('metricSelect').selectedOptions[0].textContent;
+
+  const shows = filteredRecords().filter(r => r.artist === artist);
+  const valued = shows
+    .map(r => ({ r, v: metricValue(r, metric, hour), pacing: pacingFor(r, metric, hour) }))
+    .filter(x => x.v !== null && x.v !== undefined);
+  const venues = [...new Set(shows.map(r => r.venue))];
+  const total = valued.reduce((s, x) => s + x.v, 0);
+  const avg = valued.length ? total / valued.length : null;
+  const paceCounts = { ahead: 0, below: 0, onpar: 0, unknown: 0 };
+  valued.forEach(x => {
+    if (!x.pacing || x.pacing.cls === 'pace-unknown') paceCounts.unknown++;
+    else if (x.pacing.cls === 'pace-ahead') paceCounts.ahead++;
+    else if (x.pacing.cls === 'pace-below') paceCounts.below++;
+    else paceCounts.onpar++;
+  });
+
+  const paceLine = valued.length
+    ? `<span class="pace-ahead">▲ ${paceCounts.ahead} ahead</span> · <span class="pace-onpar">● ${paceCounts.onpar} on par</span> · <span class="pace-below">▼ ${paceCounts.below} below</span> their respective venue averages`
+    : 'Not enough data yet to compute pacing for this selection.';
+
+  const statCards = `
+    <div class="commentary-highlight-stats">
+      <div class="commentary-stat"><span class="num">${shows.length}</span><span class="lbl">show${shows.length === 1 ? '' : 's'} on file</span></div>
+      <div class="commentary-stat"><span class="num">${fmt(total ? Math.round(total) : null)}</span><span class="lbl">total ${metricLabel.toLowerCase()}</span></div>
+      <div class="commentary-stat"><span class="num">${fmt(avg !== null ? Math.round(avg) : null)}</span><span class="lbl">avg ${metricLabel.toLowerCase()}</span></div>
+      <div class="commentary-stat"><span class="num">${venues.length}</span><span class="lbl">venue${venues.length === 1 ? '' : 's'}</span></div>
+    </div>
+    <p class="compare-hint" style="margin: -4px 0 14px;">${paceLine}</p>
+  `;
+
+  const matched = insightsMentioning([artist]);
+  const matchedHTML = matched.length
+    ? matched.map(insightBlockHTML).join('')
+    : '<div class="empty">No precomputed commentary mentions this artist/tour yet — it will appear here after the next sync if warranted.</div>';
+
+  return `
+    <div class="commentary-highlight">
+      <p class="section-title">Spotlight — ${artist}</p>
+      ${statCards}
+      ${matchedHTML}
+    </div>
+  `;
+}
+
+function renderComparativeCommentary(selected) {
+  const metric = document.getElementById('metricSelect').value;
+  const hour = document.getElementById('hourSelect').value;
+  const metricLabel = document.getElementById('metricSelect').selectedOptions[0].textContent;
+  const { sharedVenues, perArtist, withData } = computeComparisonData(selected, metric, hour);
+
+  let venueHTML = '';
+  if (sharedVenues.length) {
+    venueHTML = `<div class="venue-match-note">Strongest comparison basis — same venue, different artists (city/capacity held constant):</div>` +
+      sharedVenues.map(([venue, xs]) => {
+        const sorted = xs.slice().sort((a, b) => b.v - a.v);
+        const items = sorted.map(x => `<span style="color:${artistColor(x.r.artist)}; font-weight:600;">${x.r.artist}</span> ${fmt(x.v)}`).join(' vs. ');
+        const top = sorted[0], bottom = sorted[sorted.length - 1];
+        const ratio = bottom.v > 0 ? (top.v / bottom.v).toFixed(1) : null;
+        return `<div class="venue-match-row"><strong>${venue}</strong> — ${items}${ratio && ratio !== '1.0' ? ` (${top.r.artist} ${ratio}× ${bottom.r.artist})` : ''}${xs.length <= 2 ? ' <span style="color:var(--muted);font-size:11px;">(small sample — 2 shows on file at this venue)</span>' : ''}</div>`;
+      }).join('');
+  } else {
+    venueHTML = `<div class="venue-match-note">No shared venues among these artists yet — the comparison below falls back to a weaker basis, each artist's overall peak/average.</div>`;
+  }
+
+  const paceHTML = perArtist.map(p => {
+    if (!p.count) {
+      return `<div class="artist-line"><span class="dot" style="background:${p.color}"></span>
+        <span class="artist-name">${p.artist}</span>
+        <span class="artist-stats">no shows match the current filters</span></div>`;
+    }
+    const pc = p.paceCounts;
+    return `<div class="artist-line"><span class="dot" style="background:${p.color}"></span>
+      <span class="artist-name">${p.artist}</span>
+      <span class="artist-stats"><span class="pace-ahead">▲${pc.ahead}</span> <span class="pace-onpar">●${pc.onpar}</span> <span class="pace-below">▼${pc.below}</span> vs. venue averages — peak ${fmt(p.peak)} (${p.peakShow})</span></div>`;
+  }).join('');
+
+  let takeaway = '';
+  if (withData.length >= 2) {
+    const top = withData[0];
+    const bottom = withData[withData.length - 1];
+    const ratio = bottom.peak > 0 ? (top.peak / bottom.peak).toFixed(1) : '—';
+    const pacingRanked = perArtist
+      .filter(p => p.count > 0)
+      .slice()
+      .sort((a, b) => (b.paceCounts.ahead - b.paceCounts.below) - (a.paceCounts.ahead - a.paceCounts.below));
+    const bestPacing = pacingRanked[0];
+    const bestHasSignal = bestPacing && (bestPacing.paceCounts.ahead + bestPacing.paceCounts.below + bestPacing.paceCounts.onpar) > 0;
+    takeaway = `<div class="takeaway">
+      <strong>${top.artist}</strong> leads this comparison by peak ${metricLabel.toLowerCase()} at ${fmt(top.peak)} (${top.peakShow})${ratio !== '—' && ratio !== '1.0' ? `, ${ratio}× ${bottom.artist}'s peak of ${fmt(bottom.peak)}` : ''}.
+      ${bestHasSignal ? ` <strong>${bestPacing.artist}</strong> is showing the strongest pacing relative to venue history (▲${bestPacing.paceCounts.ahead} ahead vs. ▼${bestPacing.paceCounts.below} below).` : ''}
+      Ranking by peak ${metricLabel.toLowerCase()}: ${withData.map(p => p.artist).join(' > ')}.
+    </div>`;
+  } else {
+    takeaway = `<div class="takeaway">Not enough overlapping data yet for a head-to-head ranking — check back after more shows/dates are synced.</div>`;
+  }
+
+  const matchedMulti = insightsMentioningMultiple(selected);
+  const matchedHTML = matchedMulti.length
+    ? `<p class="section-title" style="margin-top:16px;">Precomputed cross-artist commentary</p>${matchedMulti.map(insightBlockHTML).join('')}`
+    : '';
+
+  return `
+    <div class="commentary-highlight">
+      <p class="section-title">Comparative analysis — ${selected.join(' vs. ')}</p>
+      ${venueHTML}
+      ${paceHTML}
+      ${takeaway}
+      ${matchedHTML}
+    </div>
+  `;
 }
 
 function sortRows(rows, key, dir) {
@@ -962,17 +1168,40 @@ function renderTable() {
 
 function renderInsights() {
   const el = document.getElementById('insights');
-  if (!state.insights || !state.insights.insights || !state.insights.insights.length) {
-    el.innerHTML = '<div class="empty">No precomputed insights yet — these are generated by Claude each time the scheduled sync runs (currently daily). Once it has run at least once and the results are pushed to GitHub, they\'ll show up here.</div>';
+  const selected = state.compareArtists;
+  const hasInsights = state.insights && state.insights.insights && state.insights.insights.length;
+
+  const generalHTML = () => hasInsights
+    ? state.insights.insights.map(insightBlockHTML).join('')
+    : '<div class="empty">No precomputed insights yet — these are generated by Claude each time the scheduled sync runs. Once it has run at least once and the results are pushed to GitHub, they\'ll show up here.</div>';
+
+  if (selected.length === 0) {
+    el.innerHTML = `
+      <p class="compare-hint" style="margin:-6px 0 14px;">Select one or more artists in the "Compare artists" box above to see commentary and comparative analysis focused on them here. Showing all commentary for now.</p>
+      ${generalHTML()}
+    `;
     return;
   }
-  el.innerHTML = state.insights.insights.map(i => `
-    <div class="insight" ${i.category === 'early_read' ? 'style="border-left-color: var(--accent-2);"' : ''}>
-      ${i.category === 'early_read' ? '<span class="badge" style="border-color: var(--accent-2); color: var(--accent-2); margin-bottom:6px; display:inline-block;">Early read · 12–24h</span><br>' : ''}
-      <h4>${i.headline}</h4>
-      <p>${i.detail}</p>
-    </div>
-  `).join('');
+
+  if (selected.length === 1) {
+    const spotlight = renderArtistSpotlight(selected[0]);
+    const matched = hasInsights ? insightsMentioning(selected) : [];
+    const rest = hasInsights ? state.insights.insights.filter(i => !matched.includes(i)) : [];
+    el.innerHTML = `
+      ${spotlight}
+      ${rest.length ? `<p class="section-title" style="margin-top:4px;">Other commentary</p>${rest.map(insightBlockHTML).join('')}` : ''}
+    `;
+    return;
+  }
+
+  // 2+ artists selected — comparative analysis takes the prominent spot.
+  const comparative = renderComparativeCommentary(selected);
+  const matched = hasInsights ? insightsMentioning(selected) : [];
+  const rest = hasInsights ? state.insights.insights.filter(i => !matched.includes(i)) : [];
+  el.innerHTML = `
+    ${comparative}
+    ${rest.length ? `<p class="section-title" style="margin-top:4px;">Other commentary</p>${rest.map(insightBlockHTML).join('')}` : ''}
+  `;
 }
 
 function renderAll() {
