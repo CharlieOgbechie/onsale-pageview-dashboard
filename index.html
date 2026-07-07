@@ -192,6 +192,50 @@
   }
   .commentary-stat .num { font-size: 18px; font-weight: 700; display: block; line-height: 1.3; }
   .commentary-stat .lbl { color: var(--muted); }
+  .insight-dataquality { border-left-color: var(--border) !important; opacity: 0.82; }
+  .insight-dataquality h4 { color: var(--muted); }
+  .dq-badge {
+    display: inline-block;
+    font-size: 11px;
+    padding: 2px 7px;
+    border-radius: 10px;
+    border: 1px solid var(--border);
+    color: var(--muted);
+    margin-bottom: 6px;
+  }
+  .dq-section { margin-top: 20px; }
+  .dq-section summary {
+    cursor: pointer;
+    font-size: 12.5px;
+    color: var(--muted);
+    padding: 8px 0;
+    user-select: none;
+  }
+  .dq-section summary:hover { color: var(--text); }
+  .dq-caveats { margin-top: 14px; }
+  .exec-summary {
+    background: rgba(79, 209, 139, 0.07);
+    border: 1px solid rgba(79, 209, 139, 0.28);
+    border-radius: 8px;
+    padding: 12px 14px;
+    margin-bottom: 16px;
+  }
+  .exec-summary-label {
+    font-size: 11px;
+    text-transform: uppercase;
+    letter-spacing: .04em;
+    color: var(--good);
+    margin: 0 0 6px;
+    font-weight: 700;
+  }
+  .exec-summary-text { margin: 0 0 6px; font-size: 14px; line-height: 1.55; font-weight: 500; }
+  .exec-summary-basis { margin: 0; font-size: 12px; color: var(--muted); line-height: 1.4; }
+  .exec-summary-actions { margin-top: 10px; }
+  .trajectory-block { margin: 14px 0; }
+  .sparkline-wrap { display: flex; align-items: flex-end; gap: 6px; height: 76px; margin: 8px 0; }
+  .sparkline-bar-col { display: flex; flex-direction: column; align-items: center; gap: 4px; flex: 1; }
+  .sparkline-bar { width: 100%; max-width: 30px; background: var(--accent); border-radius: 2px 2px 0 0; }
+  .sparkline-hour { font-size: 10px; color: var(--muted); }
   .ask-box { display: flex; gap: 8px; margin-bottom: 16px; }
   .ask-box input { flex: 1; }
   .ask-box button {
@@ -537,6 +581,14 @@ function fmt(n) {
   return Number(n).toLocaleString();
 }
 
+function escapeAttr(str) {
+  return String(str)
+    .replace(/&/g, '&amp;')
+    .replace(/"/g, '&quot;')
+    .replace(/</g, '&lt;')
+    .replace(/>/g, '&gt;');
+}
+
 function populateHourOptions() {
   const hourSelect = document.getElementById('hourSelect');
   const hours = new Set();
@@ -609,6 +661,123 @@ function pacingFor(record, metric, hour) {
     return { symbol: '▼', cls: 'pace-below', label: `${Math.round((1 - ratio) * 100)}% below the ${record.venue} average (n=${stats.count})` };
   }
   return { symbol: '●', cls: 'pace-onpar', label: `Within 15% of the ${record.venue} average (n=${stats.count})` };
+}
+
+// Raw ratio version of pacingFor (which returns a rounded/formatted label) —
+// used wherever we need to average/aggregate the actual number, e.g. the
+// executive-summary sentences and benchmark deltas.
+function pacingRatio(record, metric, hour) {
+  const value = metricValue(record, metric, hour);
+  if (value === null || value === undefined) return null;
+  const stats = venueAverage(record.venue, metric, hour, record.id);
+  if (!stats || !stats.avg) return null;
+  return { ratio: value / stats.avg, count: stats.count, venue: record.venue };
+}
+
+function demandLean(avgRatio) {
+  if (avgRatio === null || avgRatio === undefined) return { verb: 'has no venue-average benchmark yet', pct: null };
+  if (avgRatio >= PACE_AHEAD_THRESHOLD) return { verb: 'tracking ahead of', pct: Math.round((avgRatio - 1) * 100) };
+  if (avgRatio <= PACE_BELOW_THRESHOLD) return { verb: 'tracking below', pct: Math.round((1 - avgRatio) * 100) };
+  return { verb: 'tracking in line with', pct: Math.round(Math.abs(avgRatio - 1) * 100) };
+}
+
+function demandQualifier(avgRatio) {
+  if (avgRatio === null || avgRatio === undefined) return null;
+  if (avgRatio >= 1.5) return 'exceptionally strong';
+  if (avgRatio >= PACE_AHEAD_THRESHOLD) return 'strong';
+  if (avgRatio >= PACE_BELOW_THRESHOLD) return 'in line with expectations';
+  if (avgRatio >= 0.6) return 'soft';
+  return 'significantly under-tracking';
+}
+
+// The 12h->24h->48h->72h->96h shape: are views still climbing, front-loaded
+// and cooling, or steady? Only meaningful for the hour-bucketed view metrics
+// (edp/adp), not the single-value queue metrics.
+function trajectoryFor(records, field) {
+  const hourSet = new Set();
+  records.forEach(r => Object.keys(r[field] || {}).forEach(h => hourSet.add(Number(h))));
+  const hours = [...hourSet].sort((a, b) => a - b);
+  const points = hours.map(h => {
+    const vals = records.map(r => (r[field] || {})[String(h)]).filter(v => v !== null && v !== undefined);
+    return { hour: h, avg: vals.length ? vals.reduce((a, b) => a + b, 0) / vals.length : null };
+  }).filter(p => p.avg !== null && p.avg > 0);
+  if (points.length < 2) return null;
+
+  const rates = [];
+  for (let i = 1; i < points.length; i++) {
+    const gap = points[i].hour - points[i - 1].hour;
+    const delta = points[i].avg - points[i - 1].avg;
+    rates.push(gap > 0 ? delta / gap : 0);
+  }
+  const firstRate = rates[0];
+  const lastRate = rates[rates.length - 1];
+
+  let shape, label;
+  if (rates.length < 2) {
+    shape = 'limited';
+    label = 'Only one window-to-window step on file — not enough yet to characterize the curve shape.';
+  } else if (firstRate <= 0) {
+    shape = 'flat';
+    label = 'Views are flat/plateaued across the windows on file.';
+  } else if (lastRate < firstRate * 0.6) {
+    shape = 'front-loaded';
+    label = 'Front-loaded — most of the growth happened early and has since slowed.';
+  } else if (lastRate > firstRate * 1.2) {
+    shape = 'accelerating';
+    label = 'Still accelerating — growth rate is increasing rather than the usual early-peak-then-plateau pattern.';
+  } else {
+    shape = 'steady';
+    label = 'Steady, consistent growth rate across the windows on file.';
+  }
+  return { points, shape, label };
+}
+
+function sparklineHTML(points) {
+  const max = Math.max(...points.map(p => p.avg), 1);
+  const bars = points.map(p => {
+    const h = Math.max(4, Math.round((p.avg / max) * 56));
+    return `<div class="sparkline-bar-col">
+      <div class="sparkline-bar" style="height:${h}px;" title="+${p.hour}h: ${fmt(Math.round(p.avg))}"></div>
+      <div class="sparkline-hour">+${p.hour}h</div>
+    </div>`;
+  }).join('');
+  return `<div class="sparkline-wrap">${bars}</div>`;
+}
+
+function trajectorySectionHTML(traj, metricLabel) {
+  if (!traj) return '';
+  return `
+    <div class="trajectory-block">
+      <p class="section-title" style="margin-bottom:2px;">Trajectory — ${metricLabel} (avg across selection)</p>
+      ${sparklineHTML(traj.points)}
+      <p class="compare-hint" style="margin:2px 0 0;">${traj.label}</p>
+    </div>
+  `;
+}
+
+async function copySummaryToClipboard(btn) {
+  const text = btn.dataset.summary || '';
+  let copied = false;
+  try {
+    await navigator.clipboard.writeText(text);
+    copied = true;
+  } catch (e) {
+    try {
+      const ta = document.createElement('textarea');
+      ta.value = text;
+      ta.style.position = 'fixed';
+      ta.style.opacity = '0';
+      document.body.appendChild(ta);
+      ta.select();
+      document.execCommand('copy');
+      document.body.removeChild(ta);
+      copied = true;
+    } catch (e2) { /* clipboard unavailable — leave button text as a hint */ }
+  }
+  const original = btn.dataset.originalLabel || btn.textContent;
+  btn.dataset.originalLabel = original;
+  btn.textContent = copied ? 'Copied ✓' : 'Copy failed — select manually';
+  setTimeout(() => { btn.textContent = original; }, 1600);
 }
 
 function tourKeyFor(r) {
@@ -947,15 +1116,19 @@ function computeComparisonData(selected, metric, hour) {
   const perArtist = selected.map((artist, i) => {
     const shows = rows.filter(x => x.r.artist === artist && x.v !== null && x.v !== undefined);
     const paceCounts = { ahead: 0, below: 0, onpar: 0, unknown: 0 };
+    const ratios = [];
     filteredRecords().filter(r => r.artist === artist).forEach(r => {
       const p = pacingFor(r, metric, hour);
       if (!p || p.cls === 'pace-unknown') paceCounts.unknown++;
       else if (p.cls === 'pace-ahead') paceCounts.ahead++;
       else if (p.cls === 'pace-below') paceCounts.below++;
       else paceCounts.onpar++;
+      const pr = pacingRatio(r, metric, hour);
+      if (pr) ratios.push(pr.ratio);
     });
+    const avgRatio = ratios.length ? ratios.reduce((a, b) => a + b, 0) / ratios.length : null;
     if (!shows.length) {
-      return { artist, color: COMPARE_PALETTE[i % COMPARE_PALETTE.length], count: 0, paceCounts };
+      return { artist, color: COMPARE_PALETTE[i % COMPARE_PALETTE.length], count: 0, paceCounts, avgRatio };
     }
     const top = shows.reduce((a, b) => (b.v > a.v ? b : a));
     const avg = shows.reduce((sum, x) => sum + x.v, 0) / shows.length;
@@ -967,6 +1140,7 @@ function computeComparisonData(selected, metric, hour) {
       peakShow: `${top.r.venue}${top.r.city ? ', ' + top.r.city : ''}`,
       avg,
       paceCounts,
+      avgRatio,
     };
   });
 
@@ -1034,12 +1208,35 @@ function renderComparisonSummary() {
 // with what the Compare Shows chart/table show. ---
 
 function insightBlockHTML(i) {
+  const isDataQuality = i.category === 'data_quality';
+  const isEarlyRead = i.category === 'early_read';
   return `
-    <div class="insight" ${i.category === 'early_read' ? 'style="border-left-color: var(--accent-2);"' : ''}>
-      ${i.category === 'early_read' ? '<span class="badge" style="border-color: var(--accent-2); color: var(--accent-2); margin-bottom:6px; display:inline-block;">Early read · 12–24h</span><br>' : ''}
+    <div class="insight ${isDataQuality ? 'insight-dataquality' : ''}" ${isEarlyRead ? 'style="border-left-color: var(--accent-2);"' : ''}>
+      ${isEarlyRead ? '<span class="badge" style="border-color: var(--accent-2); color: var(--accent-2); margin-bottom:6px; display:inline-block;">Early read · 12–24h</span><br>' : ''}
+      ${isDataQuality ? '<span class="dq-badge">⚠ Data quality note — not a demand signal</span><br>' : ''}
       <h4>${i.headline}</h4>
       <p>${i.detail}</p>
     </div>
+  `;
+}
+
+// Splits a list of insights into genuine demand commentary vs. data-quality
+// flags about the source sheets themselves (wrong file contents, duplicated
+// figures, mismatched labels, etc.) — the latter should never be mistaken for
+// a demand signal or repeated to a client, so they're always shown separately.
+function splitInsights(list) {
+  const demand = list.filter(i => i.category !== 'data_quality');
+  const dataQuality = list.filter(i => i.category === 'data_quality');
+  return { demand, dataQuality };
+}
+
+function dataQualitySectionHTML(dataQuality, open) {
+  if (!dataQuality.length) return '';
+  return `
+    <details class="dq-section" ${open ? 'open' : ''}>
+      <summary>⚠ ${dataQuality.length} data quality flag${dataQuality.length === 1 ? '' : 's'} — source-sheet issues, not demand signals (click to expand)</summary>
+      <div>${dataQuality.map(insightBlockHTML).join('')}</div>
+    </details>
   `;
 }
 
@@ -1081,6 +1278,7 @@ function renderArtistSpotlight(artist) {
   const metric = document.getElementById('metricSelect').value;
   const hour = document.getElementById('hourSelect').value;
   const metricLabel = document.getElementById('metricSelect').selectedOptions[0].textContent;
+  const isQueueMetric = metric === 'onsale_peak_queue' || metric === 'presale_peak_queue';
 
   const shows = filteredRecords().filter(r => r.artist === artist);
   const valued = shows
@@ -1097,9 +1295,36 @@ function renderArtistSpotlight(artist) {
     else paceCounts.onpar++;
   });
 
-  const paceLine = valued.length
-    ? `<span class="pace-ahead">▲ ${paceCounts.ahead} ahead</span> · <span class="pace-onpar">● ${paceCounts.onpar} on par</span> · <span class="pace-below">▼ ${paceCounts.below} below</span> their respective venue averages`
-    : 'Not enough data yet to compute pacing for this selection.';
+  // Executive summary: a paste-ready sentence, not just stats to synthesize yourself.
+  const ratios = shows.map(r => pacingRatio(r, metric, hour)).filter(Boolean);
+  const avgRatio = ratios.length ? ratios.reduce((s, x) => s + x.ratio, 0) / ratios.length : null;
+  const lean = demandLean(avgRatio);
+  const qualifier = demandQualifier(avgRatio);
+  const benchmarkVenues = [...new Set(ratios.map(x => x.venue))];
+  const traj = isQueueMetric ? null : trajectoryFor(shows, metric === 'edp' ? 'edp_views_by_hour' : 'adp_views_by_hour');
+  const sampleCaveat = ratios.length === 1 ? ', based on a single comparison point so treat this as directional' : '';
+
+  const readout = avgRatio === null
+    ? `Not enough same-venue benchmark data yet to say how ${artist} is tracking relative to venue history.`
+    : `${artist}'s ${shows.length} show${shows.length === 1 ? '' : 's'} ${lean.verb} the venue-history average by ${lean.pct}%${sampleCaveat} — ${qualifier}${traj && traj.shape !== 'limited' ? `, ${traj.label.toLowerCase().replace(/\.$/, '')}` : ''}.`;
+  const basisText = ratios.length
+    ? `Comparison basis: historical average set by other artists at ${benchmarkVenues.length === 1 ? 'the same venue' : `these ${benchmarkVenues.length} venues`} (venue match — the strongest available basis), based on ${ratios.reduce((s, x) => s + x.count, 0)} comparison show${ratios.reduce((s, x) => s + x.count, 0) === 1 ? '' : 's'} on file.`
+    : `No same-venue benchmark on file yet for ${artist} — treat any read here as provisional.`;
+  const execPlainText = `${readout} ${basisText}`;
+
+  const execSummaryHTML = `
+    <div class="exec-summary">
+      <p class="exec-summary-label">Executive summary</p>
+      <p class="exec-summary-text">${readout}</p>
+      <p class="exec-summary-basis">${basisText}</p>
+      <div class="exec-summary-actions">
+        <button type="button" class="btn-secondary copy-summary-btn" data-summary="${escapeAttr(execPlainText)}">Copy summary</button>
+      </div>
+    </div>
+  `;
+
+  const deltaCls = avgRatio === null ? '' : (avgRatio >= PACE_AHEAD_THRESHOLD ? 'pace-ahead' : avgRatio <= PACE_BELOW_THRESHOLD ? 'pace-below' : 'pace-onpar');
+  const deltaText = avgRatio === null ? '—' : `${avgRatio >= 1 ? '+' : '-'}${Math.abs(Math.round((avgRatio - 1) * 100))}%`;
 
   const statCards = `
     <div class="commentary-highlight-stats">
@@ -1107,20 +1332,30 @@ function renderArtistSpotlight(artist) {
       <div class="commentary-stat"><span class="num">${fmt(total ? Math.round(total) : null)}</span><span class="lbl">total ${metricLabel.toLowerCase()}</span></div>
       <div class="commentary-stat"><span class="num">${fmt(avg !== null ? Math.round(avg) : null)}</span><span class="lbl">avg ${metricLabel.toLowerCase()}</span></div>
       <div class="commentary-stat"><span class="num">${venues.length}</span><span class="lbl">venue${venues.length === 1 ? '' : 's'}</span></div>
+      <div class="commentary-stat"><span class="num ${deltaCls}">${deltaText}</span><span class="lbl">vs venue avg</span></div>
     </div>
-    <p class="compare-hint" style="margin: -4px 0 14px;">${paceLine}</p>
+    <p class="compare-hint" style="margin: -4px 0 14px;">${valued.length ? `<span class="pace-ahead">▲ ${paceCounts.ahead} ahead</span> · <span class="pace-onpar">● ${paceCounts.onpar} on par</span> · <span class="pace-below">▼ ${paceCounts.below} below</span> their respective venue averages` : 'Not enough data yet to compute pacing for this selection.'}</p>
   `;
 
+  const trajectoryHTML = trajectorySectionHTML(traj, metricLabel);
+
   const matched = insightsMentioning([artist]);
-  const matchedHTML = matched.length
-    ? matched.map(insightBlockHTML).join('')
-    : '<div class="empty">No precomputed commentary mentions this artist/tour yet — it will appear here after the next sync if warranted.</div>';
+  const { demand: matchedDemand, dataQuality: matchedDQ } = splitInsights(matched);
+  const matchedHTML = matchedDemand.length
+    ? matchedDemand.map(insightBlockHTML).join('')
+    : '<div class="empty">No demand commentary mentions this artist/tour yet — it will appear here after the next sync if warranted.</div>';
+  const caveatsHTML = matchedDQ.length
+    ? `<div class="dq-caveats"><p class="section-title" style="color:var(--muted);">Data caveats for this selection</p>${matchedDQ.map(insightBlockHTML).join('')}</div>`
+    : '';
 
   return `
     <div class="commentary-highlight">
       <p class="section-title">Spotlight — ${artist}</p>
+      ${execSummaryHTML}
       ${statCards}
+      ${trajectoryHTML}
       ${matchedHTML}
+      ${caveatsHTML}
     </div>
   `;
 }
@@ -1145,6 +1380,10 @@ function renderComparativeCommentary(selected) {
     venueHTML = `<div class="venue-match-note">No shared venues among these artists yet — the comparison below falls back to a weaker basis, each artist's overall peak/average.</div>`;
   }
 
+  const isQueueMetric = metric === 'onsale_peak_queue' || metric === 'presale_peak_queue';
+  const deltaCls = r => r === null ? '' : (r >= PACE_AHEAD_THRESHOLD ? 'pace-ahead' : r <= PACE_BELOW_THRESHOLD ? 'pace-below' : 'pace-onpar');
+  const deltaText = r => r === null ? '—' : `${r >= 1 ? '+' : '-'}${Math.abs(Math.round((r - 1) * 100))}%`;
+
   const paceHTML = perArtist.map(p => {
     if (!p.count) {
       return `<div class="artist-line"><span class="dot" style="background:${p.color}"></span>
@@ -1154,41 +1393,94 @@ function renderComparativeCommentary(selected) {
     const pc = p.paceCounts;
     return `<div class="artist-line"><span class="dot" style="background:${p.color}"></span>
       <span class="artist-name">${p.artist}</span>
-      <span class="artist-stats"><span class="pace-ahead">▲${pc.ahead}</span> <span class="pace-onpar">●${pc.onpar}</span> <span class="pace-below">▼${pc.below}</span> vs. venue averages — peak ${fmt(p.peak)} (${p.peakShow})</span></div>`;
+      <span class="artist-stats"><span class="pace-ahead">▲${pc.ahead}</span> <span class="pace-onpar">●${pc.onpar}</span> <span class="pace-below">▼${pc.below}</span> vs. venue averages (<span class="${deltaCls(p.avgRatio)}">${deltaText(p.avgRatio)}</span> avg) — peak ${fmt(p.peak)} (${p.peakShow})</span></div>`;
   }).join('');
 
-  let takeaway = '';
+  // Executive summary: a paste-ready sentence combining the ranking, the
+  // comparison basis actually used, each artist's benchmark lean, and (when
+  // available) a trajectory note for whoever's leading.
+  let execSummaryHTML = '';
   if (withData.length >= 2) {
     const top = withData[0];
     const bottom = withData[withData.length - 1];
-    const ratio = bottom.peak > 0 ? (top.peak / bottom.peak).toFixed(1) : '—';
-    const pacingRanked = perArtist
+    const ratio = bottom.peak > 0 ? (top.peak / bottom.peak).toFixed(1) : null;
+    const basisTier = sharedVenues.length
+      ? `same-venue matchups (${sharedVenues.length} shared venue${sharedVenues.length === 1 ? '' : 's'} on file — the strongest available basis)`
+      : `each artist's own overall average (no shared venue on file yet — a weaker basis)`;
+
+    const leanParts = perArtist
       .filter(p => p.count > 0)
-      .slice()
-      .sort((a, b) => (b.paceCounts.ahead - b.paceCounts.below) - (a.paceCounts.ahead - a.paceCounts.below));
-    const bestPacing = pacingRanked[0];
-    const bestHasSignal = bestPacing && (bestPacing.paceCounts.ahead + bestPacing.paceCounts.below + bestPacing.paceCounts.onpar) > 0;
-    takeaway = `<div class="takeaway">
-      <strong>${top.artist}</strong> leads this comparison by peak ${metricLabel.toLowerCase()} at ${fmt(top.peak)} (${top.peakShow})${ratio !== '—' && ratio !== '1.0' ? `, ${ratio}× ${bottom.artist}'s peak of ${fmt(bottom.peak)}` : ''}.
-      ${bestHasSignal ? ` <strong>${bestPacing.artist}</strong> is showing the strongest pacing relative to venue history (▲${bestPacing.paceCounts.ahead} ahead vs. ▼${bestPacing.paceCounts.below} below).` : ''}
-      Ranking by peak ${metricLabel.toLowerCase()}: ${withData.map(p => p.artist).join(' > ')}.
-    </div>`;
+      .map(p => {
+        const lean = demandLean(p.avgRatio);
+        return p.avgRatio === null ? `${p.artist} has no venue benchmark yet` : `${p.artist} is ${lean.verb} venue history by ${lean.pct}%`;
+      });
+
+    let trendNote = '';
+    if (!isQueueMetric) {
+      const topRecords = filteredRecords().filter(r => r.artist === top.artist);
+      const topTraj = trajectoryFor(topRecords, metric === 'edp' ? 'edp_views_by_hour' : 'adp_views_by_hour');
+      if (topTraj && topTraj.shape !== 'limited') trendNote = ` ${top.artist}'s trajectory: ${topTraj.label}`;
+    }
+
+    const readout = `${top.artist} leads this comparison by peak ${metricLabel.toLowerCase()} at ${fmt(top.peak)} (${top.peakShow})${ratio && ratio !== '1.0' ? `, ${ratio}× ${bottom.artist}'s peak of ${fmt(bottom.peak)}` : ''}. ${leanParts.join('; ')}.${trendNote}`;
+    const basisText = `Comparison basis: ${basisTier}. Ranking by peak ${metricLabel.toLowerCase()}: ${withData.map(p => p.artist).join(' > ')}.`;
+    const execPlainText = `${readout} ${basisText}`;
+
+    execSummaryHTML = `
+      <div class="exec-summary">
+        <p class="exec-summary-label">Executive summary</p>
+        <p class="exec-summary-text">${readout}</p>
+        <p class="exec-summary-basis">${basisText}</p>
+        <div class="exec-summary-actions">
+          <button type="button" class="btn-secondary copy-summary-btn" data-summary="${escapeAttr(execPlainText)}">Copy summary</button>
+        </div>
+      </div>
+    `;
   } else {
-    takeaway = `<div class="takeaway">Not enough overlapping data yet for a head-to-head ranking — check back after more shows/dates are synced.</div>`;
+    execSummaryHTML = `<div class="exec-summary"><p class="exec-summary-text" style="font-weight:400;">Not enough overlapping data yet for a head-to-head ranking — check back after more shows/dates are synced.</p></div>`;
+  }
+
+  // Trajectory shape per artist, normalized to each artist's own max so wildly
+  // different scales are still visually comparable at a glance.
+  let trajectoryHTML = '';
+  if (!isQueueMetric) {
+    const field = metric === 'edp' ? 'edp_views_by_hour' : 'adp_views_by_hour';
+    const perArtistTraj = perArtist
+      .filter(p => p.count > 0)
+      .map(p => ({ artist: p.artist, traj: trajectoryFor(filteredRecords().filter(r => r.artist === p.artist), field) }))
+      .filter(x => x.traj);
+    if (perArtistTraj.length) {
+      trajectoryHTML = `
+        <div class="trajectory-block">
+          <p class="section-title" style="margin-bottom:2px;">Trajectory — ${metricLabel} (avg per artist, each normalized to its own scale)</p>
+          ${perArtistTraj.map(x => `
+            <p class="compare-hint" style="margin:10px 0 0;"><strong style="color:var(--text);">${x.artist}</strong></p>
+            ${sparklineHTML(x.traj.points)}
+            <p class="compare-hint" style="margin:0 0 0;">${x.traj.label}</p>
+          `).join('')}
+        </div>
+      `;
+    }
   }
 
   const matchedMulti = insightsMentioningMultiple(selected);
-  const matchedHTML = matchedMulti.length
-    ? `<p class="section-title" style="margin-top:16px;">Precomputed cross-artist commentary</p>${matchedMulti.map(insightBlockHTML).join('')}`
+  const { demand: matchedDemand, dataQuality: matchedDQ } = splitInsights(matchedMulti);
+  const matchedHTML = matchedDemand.length
+    ? `<p class="section-title" style="margin-top:16px;">Precomputed cross-artist commentary</p>${matchedDemand.map(insightBlockHTML).join('')}`
+    : '';
+  const caveatsHTML = matchedDQ.length
+    ? `<div class="dq-caveats"><p class="section-title" style="color:var(--muted);">Data caveats for this comparison</p>${matchedDQ.map(insightBlockHTML).join('')}</div>`
     : '';
 
   return `
     <div class="commentary-highlight">
       <p class="section-title">Comparative analysis — ${selected.join(' vs. ')}</p>
+      ${execSummaryHTML}
       ${venueHTML}
       ${paceHTML}
-      ${takeaway}
+      ${trajectoryHTML}
       ${matchedHTML}
+      ${caveatsHTML}
     </div>
   `;
 }
@@ -1539,37 +1831,43 @@ function renderInsights() {
   const el = document.getElementById('insights');
   const selected = state.compareArtists;
   const hasInsights = state.insights && state.insights.insights && state.insights.insights.length;
-
-  const generalHTML = () => hasInsights
-    ? state.insights.insights.map(insightBlockHTML).join('')
-    : '<div class="empty">No precomputed insights yet — these are generated by Claude each time the scheduled sync runs. Once it has run at least once and the results are pushed to GitHub, they\'ll show up here.</div>';
+  const all = hasInsights ? state.insights.insights : [];
 
   if (selected.length === 0) {
+    const { demand, dataQuality } = splitInsights(all);
+    const demandHTML = demand.length
+      ? demand.map(insightBlockHTML).join('')
+      : '<div class="empty">No demand commentary yet — these are generated by Claude each time the scheduled sync runs. Once it has run at least once and the results are pushed to GitHub, they\'ll show up here.</div>';
     el.innerHTML = `
       <p class="compare-hint" style="margin:-6px 0 14px;">Select one or more artists in the "Compare artists" box above to see commentary and comparative analysis focused on them here. Showing all commentary for now.</p>
-      ${generalHTML()}
+      ${demandHTML}
+      ${dataQualitySectionHTML(dataQuality, false)}
     `;
     return;
   }
 
   if (selected.length === 1) {
     const spotlight = renderArtistSpotlight(selected[0]);
-    const matched = hasInsights ? insightsMentioning(selected) : [];
-    const rest = hasInsights ? state.insights.insights.filter(i => !matched.includes(i)) : [];
+    const matched = insightsMentioning(selected);
+    const rest = all.filter(i => !matched.includes(i));
+    const { demand: restDemand, dataQuality: restDQ } = splitInsights(rest);
     el.innerHTML = `
       ${spotlight}
-      ${rest.length ? `<p class="section-title" style="margin-top:4px;">Other commentary</p>${rest.map(insightBlockHTML).join('')}` : ''}
+      ${restDemand.length ? `<p class="section-title" style="margin-top:4px;">Other commentary</p>${restDemand.map(insightBlockHTML).join('')}` : ''}
+      ${dataQualitySectionHTML(restDQ, false)}
     `;
     return;
   }
 
   // 2+ artists selected — comparative analysis takes the prominent spot.
   const comparative = renderComparativeCommentary(selected);
-  const matched = hasInsights ? insightsMentioning(selected) : [];
-  const rest = hasInsights ? state.insights.insights.filter(i => !matched.includes(i)) : [];
+  const matched = insightsMentioning(selected);
+  const rest = all.filter(i => !matched.includes(i));
+  const { demand: restDemand, dataQuality: restDQ } = splitInsights(rest);
   el.innerHTML = `
     ${comparative}
-    ${rest.length ? `<p class="section-title" style="margin-top:4px;">Other commentary</p>${rest.map(insightBlockHTML).join('')}` : ''}
+    ${restDemand.length ? `<p class="section-title" style="margin-top:4px;">Other commentary</p>${restDemand.map(insightBlockHTML).join('')}` : ''}
+    ${dataQualitySectionHTML(restDQ, false)}
   `;
 }
 
@@ -1707,6 +2005,12 @@ async function loadData() {
 
   renderAll();
 }
+
+document.getElementById('insights').addEventListener('click', (e) => {
+  const btn = e.target.closest('.copy-summary-btn');
+  if (!btn) return;
+  copySummaryToClipboard(btn);
+});
 
 loadData();
 

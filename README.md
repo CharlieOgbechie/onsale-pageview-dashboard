@@ -106,6 +106,22 @@ but outside context never overrides what the reports actually show.
   venues, and tags it `category: "early_read"` in `data/insights.json`. These show up
   highlighted (amber border) at the top of the "Claude analysis" panel, ahead of general
   commentary — this is what the tour team should check 12-24h after an announcement.
+- **Executive summary + trajectory in the Commentary tab** — selecting 1 artist/tour or 2+ for
+  comparison now leads with a paste-ready sentence (comparison basis + demand readout, e.g. "BTS's
+  8 shows are tracking ahead of the venue-history average by 12% — strong, steady growth across
+  the windows on file") plus a "Copy summary" button, a benchmark delta stat (e.g. "+12% vs venue
+  avg"), and a 12h→96h trajectory sparkline showing whether views are still climbing, front-loaded
+  and cooling, or steady — all computed deterministically from `data/onsales.json`, no live API
+  call needed. Trajectory only appears for EDP/ADP metrics (queue metrics are single peak values,
+  no hour-by-hour shape to show).
+- **Data quality flags kept separate from demand commentary** — every insight is tagged
+  `category: "data_quality" | "early_read" | "general"`. `data_quality` covers problems with the
+  source sheets themselves (wrong file contents, duplicated figures, mismatched labels) rather
+  than a read on demand, and is never phrased as if it tells you something about ticket demand.
+  In the Page View Commentary tab these render collapsed under a separate "data quality flags"
+  section (or as a clearly-labeled "caveats" note when relevant to a selected artist/comparison)
+  instead of being mixed in with real commentary — so nothing broken gets mistaken for something
+  safe to repeat to a client.
 
 ## Repo contents
 

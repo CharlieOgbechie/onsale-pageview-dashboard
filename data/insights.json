@@ -4,62 +4,74 @@
     {
       "headline": "Two Drive files contain the wrong artist's data entirely",
       "detail": "\"KATSEYE - EU/UK Tour 2026\" actually contains BTS/aespa/TWICE/BLACKPINK tracking tables, not KATSEYE data, and \"The Strokes - UK/EU 2026 Tour\" duplicates the aespa tracker instead of Strokes data. Both were kept and flagged (is_comparable_reference/anomaly) rather than discarded, but the underlying files need to be re-saved with correct content before they're usable for KATSEYE or Strokes reporting.",
-      "related_ids": ["katseye-unreadable-2026", "strokes-file-mismatch-aespa-data-2027", "bts-riyadh-air-metropolitano-madrid-2026-06-26--katseye---eu-uk-tour"]
+      "related_ids": ["katseye-unreadable-2026", "strokes-file-mismatch-aespa-data-2027", "bts-riyadh-air-metropolitano-madrid-2026-06-26--katseye---eu-uk-tour"],
+      "category": "data_quality"
     },
     {
       "headline": "J.Cole's Johannesburg date is the highest EDP figure in the entire dataset",
       "detail": "FNB Stadium, Johannesburg (12 Dec 2026) hit 672,585 EDP views at 72h - more than double BTS's Madrid opener (232,181) and Harry Styles' Amsterdam record (381,879) in the baseline set. Worth a sanity check on this figure given how far it sits above every other show, but if accurate it's a standout demand signal for J.Cole's only African date, and the dataset's first non-Europe/UK/Ireland data point.",
-      "related_ids": ["jcole-fnb-stadium-johannesburg-2026-12-12"]
+      "related_ids": ["jcole-fnb-stadium-johannesburg-2026-12-12"],
+      "category": "general"
     },
     {
       "headline": "BTS Stade de France queue data looks copy-pasted across both dates",
       "detail": "The onsale peak queue for both Paris dates (17 and 18 Jul 2026) is identical at ~66,300 down to every timestamp column in the source queue-tracking file - a near-impossible coincidence that suggests one row was duplicated rather than reflecting real per-date figures. Flag for whoever maintains \"BTS - RELEASES EU/UK 2026\".",
-      "related_ids": ["bts-stade-de-france-paris-2026-07-17", "bts-stade-de-france-paris-2026-07-18"]
+      "related_ids": ["bts-stade-de-france-paris-2026-07-17", "bts-stade-de-france-paris-2026-07-18"],
+      "category": "data_quality"
     },
     {
       "headline": "Don Toliver's EU/UK tour sheet has a systemic ADP row-offset bug",
       "detail": "At least four shows (Berlin, Lodz, Amsterdam, Hamburg) show ADP figures labelled with a country that doesn't match the show's actual market (e.g. a Berlin show's ADP row labelled TM_NL), consistent with the ADP country column being shifted by a few rows relative to the EDP show list. This affects a meaningful chunk of the tour's ADP data and is worth fixing at the source rather than per-row.",
-      "related_ids": ["don-toliver-uber-arena-berlin-2026-11-02", "don-toliver-atlas-arena-lodz-2026-11-03", "don-toliver-ziggo-dome-amsterdam-2026-11-05", "don-toliver-barclays-arena-hamburg-2026-11-06"]
+      "related_ids": ["don-toliver-uber-arena-berlin-2026-11-02", "don-toliver-atlas-arena-lodz-2026-11-03", "don-toliver-ziggo-dome-amsterdam-2026-11-05", "don-toliver-barclays-arena-hamburg-2026-11-06"],
+      "category": "data_quality"
     },
     {
       "headline": "Gracie Abrams' \"2026\" tour file is entirely 2027 dates",
       "detail": "Every show in \"Gracie Abrams UKEU Tour 2026\" falls between April and May 2027, not 2026 as the filename implies. All 25 records from this file are flagged anomaly:true for the mismatch - worth a filename correction to avoid future confusion.",
-      "related_ids": ["gracie-abrams-accor-arena-paris-2027-04-08", "gracie-abrams-the-o2-london-2027-04-30", "gracie-abrams-ziggo-dome-amsterdam-2027-05-07"]
+      "related_ids": ["gracie-abrams-accor-arena-paris-2027-04-08", "gracie-abrams-the-o2-london-2027-04-30", "gracie-abrams-ziggo-dome-amsterdam-2027-05-07"],
+      "category": "data_quality"
     },
     {
       "headline": "Allianz Arena (Munich) gets its first real per-show data points",
       "detail": "Previously the venue baseline had only a single aggregated megastar data point with no queue detail. BTS's two Munich dates now give real onsale peak queues of 185,701 (11 Jul) and 128,067 (12 Jul) - both below the baseline's combined onsale figure of 219,382, suggesting that baseline figure may have summed both dates rather than representing a single-show peak.",
-      "related_ids": ["bts-allianz-arena-munich-2026-07-11", "bts-allianz-arena-munich-2026-07-12"]
+      "related_ids": ["bts-allianz-arena-munich-2026-07-11", "bts-allianz-arena-munich-2026-07-12"],
+      "category": "general"
     },
     {
       "headline": "BTS Tottenham Hotspur Stadium pacing sits just under the venue's 'extraordinary event' range",
       "detail": "The venue baseline for megastar general-onsale queues at Tottenham Hotspur Stadium is 220k-533k (from Beyonce's 2023 dates). BTS's two London dates peaked at 195,640 (6 Jul) and 177,873 (7 Jul) - strong, but just under that historical extraordinary-demand band, with the usual second-night rolloff pattern.",
-      "related_ids": ["bts-tottenham-hotspur-stadium-london-2026-07-06", "bts-tottenham-hotspur-stadium-london-2026-07-07"]
+      "related_ids": ["bts-tottenham-hotspur-stadium-london-2026-07-06", "bts-tottenham-hotspur-stadium-london-2026-07-07"],
+      "category": "general"
     },
     {
       "headline": "Olivia Rodrigo's O2 London comparable dwarfs Gracie Abrams' own O2 shows",
       "detail": "A benchmark block pasted into the Gracie Abrams sheet shows Olivia Rodrigo hitting 86,721 EDP views at 72h for her 5 Apr 2027 O2 London date, roughly 10x Gracie Abrams' own O2 London peak of 8,613 (1 May 2027) at the same venue - a useful tier-gap illustration between a top-of-market pop headliner and a strong mid-tier act.",
-      "related_ids": ["olivia-rodrigo-the-o2-london-2027-04-05-comparable", "gracie-abrams-the-o2-london-2027-05-01"]
+      "related_ids": ["olivia-rodrigo-the-o2-london-2027-04-05-comparable", "gracie-abrams-the-o2-london-2027-05-01"],
+      "category": "general"
     },
     {
       "headline": "J.Cole outpaces Drake's Co-op Live comparable figures",
       "detail": "J.Cole's Co-op Live Manchester date (28 Oct 2026) reached 80,234 EDP views at 72h, well above the pasted Drake 2025 Tour benchmark for the same venue (13,354-20,500 EDP at 24h). Time windows differ so this isn't a like-for-like comparison, but it's a strong directional signal on relative demand for the two artists at the same room.",
-      "related_ids": ["jcole-co-op-live-manchester-2026-10-28", "cmp-drake-co-op-live-manchester-2025-07-25", "cmp-drake-co-op-live-manchester-2025-07-26"]
+      "related_ids": ["jcole-co-op-live-manchester-2026-10-28", "cmp-drake-co-op-live-manchester-2025-07-25", "cmp-drake-co-op-live-manchester-2025-07-26"],
+      "category": "general"
     },
     {
       "headline": "Two likely data-entry errors in the Kodaline tour sheet",
       "detail": "Carlswerk Victoria, Cologne shows a 72h EDP figure (188) lower than its own 48h figure (414), which shouldn't happen for a cumulative view count. Roundhouse London shows an implausible ~29x jump from 389 (48h) to 11,222 (72h). Both were kept as-is with notes rather than corrected, but likely need a source-sheet fix.",
-      "related_ids": ["kodaline-carlswerk-victoria-cologne-2026-11-25", "kodaline-roundhouse-london-2026-11-28"]
+      "related_ids": ["kodaline-carlswerk-victoria-cologne-2026-11-25", "kodaline-roundhouse-london-2026-11-28"],
+      "category": "data_quality"
     },
     {
       "headline": "Shakira's ES Residency shows a steep, consistent night-on-night decline",
       "detail": "EDP views at 72h drop from 36,255 (25 Sep) to 25,709 (26 Sep) to 8,465 (27 Sep) across three consecutive Madrid residency dates - a clean front-loaded demand curve typical of a residency opener, useful as a reference pattern for pacing multi-night runs.",
-      "related_ids": ["shakira-estadio-shakira-madrid-2026-09-25", "shakira-estadio-shakira-madrid-2026-09-26", "shakira-estadio-shakira-madrid-2026-09-27"]
+      "related_ids": ["shakira-estadio-shakira-madrid-2026-09-25", "shakira-estadio-shakira-madrid-2026-09-26", "shakira-estadio-shakira-madrid-2026-09-27"],
+      "category": "general"
     },
     {
       "headline": "BTS's Madrid opener lines up exactly with the existing venue baseline",
       "detail": "BTS's 26 Jun 2026 Riyadh Air Metropolitano date shows 232,181 EDP views at 72h, matching the venue-baselines.json BTS entry for this venue exactly (232,181) - a good cross-validation signal that this sync's extraction is accurate for at least this show.",
-      "related_ids": ["bts-riyadh-air-metropolitano-madrid-2026-06-26"]
+      "related_ids": ["bts-riyadh-air-metropolitano-madrid-2026-06-26"],
+      "category": "data_quality"
     }
   ]
 }
