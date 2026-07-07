@@ -194,6 +194,21 @@
     cursor: pointer;
   }
   .pagination button:disabled { opacity: 0.4; cursor: default; }
+  .tour-row { cursor: pointer; }
+  .tour-row:hover td { background: var(--panel-2); }
+  .expand-toggle { display: inline-block; width: 14px; color: var(--muted); }
+  .tour-detail-row td { padding: 0; background: #12141a; }
+  .detail-table { width: 100%; border-collapse: collapse; font-size: 12.5px; }
+  .detail-table th {
+    text-align: left;
+    padding: 6px 20px 6px 42px;
+    color: var(--muted);
+    font-weight: 500;
+    border-bottom: 1px solid var(--border);
+    cursor: default;
+  }
+  .detail-table td { padding: 6px 20px 6px 42px; border-bottom: 1px solid var(--border); }
+  .detail-table tr:last-child td { border-bottom: none; }
 </style>
 </head>
 <body>
@@ -279,7 +294,9 @@ const state = {
   viewMode: 'tour', // 'show' | 'tour' — defaults to tour so the table starts as a short summary, not 600+ rows
   venueMap: {}, // lowercase venue name -> { capacity, venue_type }
   page: 1,
+  expandedTours: new Set(), // tour keys currently drilled-into in the "By tour" table
 };
+let lastRenderedTours = []; // current page's tour rows, indexed for the delegated click handler
 const COMPARE_PALETTE = ['#6ea8fe', '#f2b84b', '#4fd18b', '#f27272', '#c792ea'];
 const MAX_COMPARE = 5;
 const PACE_AHEAD_THRESHOLD = 1.15; // 15% above venue average
@@ -445,6 +462,7 @@ function aggregateTours(rows, metric, hour) {
       avgOnsale: avgOf(g.shows.map(r => r.onsale_peak_queue)),
       tier: tiers.length ? mostCommon(tiers) : null,
       paceCounts,
+      shows: valued, // per-show breakdown, used by the click-to-expand drill-down
     };
   });
 }
@@ -730,27 +748,56 @@ function renderTourTable() {
   tours = sortRows(tours, sortKey, sortKey === key ? dir : 'desc');
 
   const { pageRows, total, totalPages, start } = paginate(tours);
+  lastRenderedTours = pageRows; // so the delegated click handler can look rows up by index
 
   const tbody = document.querySelector('#dataTable tbody');
-  tbody.innerHTML = pageRows.map(t => `
-    <tr>
-      <td>${t.artist}${t.key !== t.artist ? `<br><span class="badge">${t.key}</span>` : ''}</td>
-      <td>${t.showCount}</td>
-      <td title="${t.venues.join(', ')}">${t.venues.slice(0, 2).join(', ')}${t.venues.length > 2 ? ` +${t.venues.length - 2} more` : ''}</td>
-      <td class="tier-${t.tier || ''}">${t.tier || '—'}</td>
-      <td>${fmt(Math.round(t.total))}</td>
-      <td>${fmt(t.avg !== null ? Math.round(t.avg) : null)}</td>
-      <td>${fmt(t.avgPresale !== null ? Math.round(t.avgPresale) : null)}</td>
-      <td>${fmt(t.avgOnsale !== null ? Math.round(t.avgOnsale) : null)}</td>
-      <td>
-        <span class="pace-ahead">▲${t.paceCounts.ahead}</span>
-        <span class="pace-onpar">●${t.paceCounts.onpar}</span>
-        <span class="pace-below">▼${t.paceCounts.below}</span>
-      </td>
-    </tr>
-  `).join('') || '<tr><td colspan="9" class="empty">No tours match these filters.</td></tr>';
+  tbody.innerHTML = pageRows.map((t, i) => {
+    const expanded = state.expandedTours.has(t.key);
+    const mainRow = `
+      <tr class="tour-row" data-tour-index="${i}">
+        <td><span class="expand-toggle">${expanded ? '▾' : '▸'}</span> ${t.artist}${t.key !== t.artist ? `<br><span class="badge">${t.key}</span>` : ''}</td>
+        <td>${t.showCount}</td>
+        <td title="${t.venues.join(', ')}">${t.venues.slice(0, 2).join(', ')}${t.venues.length > 2 ? ` +${t.venues.length - 2} more` : ''}</td>
+        <td class="tier-${t.tier || ''}">${t.tier || '—'}</td>
+        <td>${fmt(Math.round(t.total))}</td>
+        <td>${fmt(t.avg !== null ? Math.round(t.avg) : null)}</td>
+        <td>${fmt(t.avgPresale !== null ? Math.round(t.avgPresale) : null)}</td>
+        <td>${fmt(t.avgOnsale !== null ? Math.round(t.avgOnsale) : null)}</td>
+        <td>
+          <span class="pace-ahead">▲${t.paceCounts.ahead}</span>
+          <span class="pace-onpar">●${t.paceCounts.onpar}</span>
+          <span class="pace-below">▼${t.paceCounts.below}</span>
+        </td>
+      </tr>`;
+    return mainRow + (expanded ? buildTourDetailRow(t) : '');
+  }).join('') || '<tr><td colspan="9" class="empty">No tours match these filters.</td></tr>';
 
   renderPaginationControls(total, totalPages, start, 'tours');
+}
+
+function buildTourDetailRow(t) {
+  const sorted = t.shows.slice().sort((a, b) => {
+    const rank = x => x.pacing && x.pacing.cls === 'pace-ahead' ? 2 : x.pacing && x.pacing.cls === 'pace-onpar' ? 1 : x.pacing && x.pacing.cls === 'pace-below' ? 0 : -1;
+    return rank(b) - rank(a) || b.v - a.v;
+  });
+  const rows = sorted.map(x => `
+    <tr>
+      <td>${x.r.venue}</td>
+      <td>${x.r.city || ''}</td>
+      <td>${x.r.date || '—'}</td>
+      <td>${fmt(x.v)}</td>
+      <td class="${x.pacing ? x.pacing.cls : ''}" title="${x.pacing ? x.pacing.label : ''}">${x.pacing ? `${x.pacing.symbol} ${x.pacing.label}` : '—'}</td>
+    </tr>
+  `).join('');
+  return `
+    <tr class="tour-detail-row">
+      <td colspan="9">
+        <table class="detail-table">
+          <thead><tr><th>Venue</th><th>City</th><th>Date</th><th>Value</th><th>Pacing</th></tr></thead>
+          <tbody>${rows || '<tr><td colspan="5" class="empty">No shows with a value for this metric.</td></tr>'}</tbody>
+        </table>
+      </td>
+    </tr>`;
 }
 
 function renderTable() {
@@ -795,17 +842,29 @@ compareInput.addEventListener('change', () => {
 });
 
 ['searchBox', 'metricSelect', 'hourSelect', 'tierSelect', 'yearSelect', 'venueTypeSelect', 'excludeAnomalies'].forEach(id => {
-  document.getElementById(id).addEventListener('input', () => { state.page = 1; renderAll(); });
+  document.getElementById(id).addEventListener('input', () => { state.page = 1; state.expandedTours.clear(); renderAll(); });
 });
 
 function setViewMode(mode) {
   state.viewMode = mode;
   state.page = 1;
+  state.expandedTours.clear();
   document.getElementById('viewShowBtn').classList.toggle('active', mode === 'show');
   document.getElementById('viewTourBtn').classList.toggle('active', mode === 'tour');
   state.sort = mode === 'tour' ? { key: 'total', dir: 'desc' } : { key: 'edp', dir: 'desc' };
   renderAll();
 }
+
+document.querySelector('#dataTable tbody').addEventListener('click', (e) => {
+  const row = e.target.closest('tr.tour-row');
+  if (!row) return;
+  const idx = Number(row.dataset.tourIndex);
+  const tour = lastRenderedTours[idx];
+  if (!tour) return;
+  if (state.expandedTours.has(tour.key)) state.expandedTours.delete(tour.key);
+  else state.expandedTours.add(tour.key);
+  renderTable();
+});
 document.getElementById('viewShowBtn').addEventListener('click', () => setViewMode('show'));
 document.getElementById('viewTourBtn').addEventListener('click', () => setViewMode('tour'));
 
