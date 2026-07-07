@@ -252,21 +252,40 @@ def slugify(s):
 
 
 def generate_insights_with_claude(client, onsales, baselines):
-    system = """You are a demand analyst for a ticketing company. Given normalized onsale \
-page-view/queue records and venue benchmark bands (including each venue's `venue_type`: \
-stadium/arena/theatre_club), write a short list of precomputed insights for a dashboard.
+    system = """You are a demand analyst for a ticketing company, building a practical benchmark \
+for likely demand -- not just reporting numbers. Given normalized onsale page-view/queue records \
+and venue benchmark bands (including each venue's `venue_type`: stadium/arena/theatre_club), \
+write a short list of precomputed insights for a dashboard.
+
+COMPARISON METHODOLOGY -- use the most scientific comparison basis available, in this priority \
+order, dropping to the next tier only when the one above doesn't give enough to say something \
+concrete:
+1. Venue match first: prefer tour-by-tour comparisons between different artists who played the \
+SAME VENUE -- this holds city/capacity/local-market factors constant, the strongest basis here.
+2. Within same-venue comparisons, further match on comparable sales stage, time window, and \
+report type (compare +24h EDP to +24h EDP, presale queue to presale queue, not mismatched pairs).
+3. Only when same-venue history is too thin, fall back to artist/genre/audience/market similarity \
+instead, and say so explicitly when you do.
+
+Compare like with like. Highlight meaningful changes in page visits, artist interest, queue \
+sizes, pacing, and demand intensity. Emphasize direction, magnitude (real numbers), and business \
+significance -- not just "higher"/"lower". Call out contradictions, gaps, or missing context that \
+limit a clean comparison (e.g. FR/IT non-comparable systems, a venue with only one prior data \
+point, a missing hour bucket). State which reports/shows you used as the comparison basis, since \
+it's always inferred here (this runs unattended). Never imply a trend from a single data point --  \
+explicitly distinguish a one-report observation, a small-sample comparison (2-4 shows), and a \
+stronger multi-event pattern (5+ shows).
 
 Write two kinds, tagged via "category":
 
 "early_read" -- for shows whose most recent available data point is only the +12h or +24h \
-bucket (no +48h/+72h/+96h yet, meaning it's within its first day post-announcement). Compare \
-that show's numbers at that hour mark against (a) the historical average for OTHER shows at the \
-same venue, and (b) 2-3 peer artists playing venues of the same venue_type/similar tier, naming \
-them explicitly with numbers. Skip a show if there isn't enough comparable data to say something \
-concrete.
+bucket (no +48h/+72h/+96h yet, meaning it's within its first day post-announcement). Apply the \
+methodology above: same-venue peers first, named explicitly with numbers; fall back to \
+venue_type/tier similarity only if same-venue history is too thin. Skip a show if there isn't \
+enough comparable data to say something concrete.
 
 "general" -- shows pacing above/below their venue's typical benchmark at later stages, notable \
-anomalies, useful cross-show/cross-tour comparisons.
+anomalies, useful cross-show/cross-tour comparisons -- same venue-first methodology.
 
 Be concise and concrete, cite numbers. Put early_read insights first when any exist, since \
 they're the most time-sensitive for the tour team.

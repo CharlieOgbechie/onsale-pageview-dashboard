@@ -154,6 +154,20 @@
     color: var(--muted);
     line-height: 1.5;
   }
+  .venue-match-note {
+    font-size: 12px;
+    color: var(--muted);
+    font-style: italic;
+    margin-bottom: 8px;
+  }
+  .venue-match-row {
+    padding: 8px 12px;
+    margin-bottom: 6px;
+    background: rgba(110, 168, 254, 0.08);
+    border: 1px solid rgba(110, 168, 254, 0.25);
+    border-radius: 6px;
+    font-size: 13px;
+  }
   .view-toggle { display: flex; gap: 6px; margin-bottom: 14px; }
   .view-toggle button {
     background: var(--panel-2);
@@ -577,6 +591,36 @@ function renderComparisonSummary() {
   const metricLabel = document.getElementById('metricSelect').selectedOptions[0].textContent;
   const rows = filteredRecords().map(r => ({ r, v: metricValue(r, metric, hour) }));
 
+  // Venue match first: the most scientific comparison basis is different
+  // artists who played the SAME venue, since that holds city/capacity/local
+  // market constant. Surface those matchups before falling back to each
+  // artist's overall peak/average (a weaker, artist-only basis).
+  const venueGroups = new Map();
+  rows.forEach(x => {
+    if (!state.compareArtists.includes(x.r.artist)) return;
+    if (x.v === null || x.v === undefined) return;
+    if (!venueGroups.has(x.r.venue)) venueGroups.set(x.r.venue, []);
+    venueGroups.get(x.r.venue).push(x);
+  });
+  const sharedVenues = [...venueGroups.entries()]
+    .filter(([, xs]) => new Set(xs.map(x => x.r.artist)).size >= 2)
+    .sort((a, b) => b[1].length - a[1].length);
+
+  let venueBlock = '';
+  if (sharedVenues.length) {
+    venueBlock = `<div class="venue-match-note">Strongest comparison basis — same venue, different artists (city/capacity held constant):</div>` +
+      sharedVenues.map(([venue, xs]) => {
+        const sorted = xs.slice().sort((a, b) => b.v - a.v);
+        const items = sorted.map(x => `<span style="color:${artistColor(x.r.artist)}; font-weight:600;">${x.r.artist}</span> ${fmt(x.v)}`).join(' vs. ');
+        const top = sorted[0], bottom = sorted[sorted.length - 1];
+        const ratio = bottom.v > 0 ? (top.v / bottom.v).toFixed(1) : null;
+        const single = sorted.length < 2 || sorted.every(x => x.v === sorted[0].v);
+        return `<div class="venue-match-row"><strong>${venue}</strong> — ${items}${ratio && ratio !== '1.0' ? ` (${top.r.artist} ${ratio}× ${bottom.r.artist})` : ''}${xs.length <= 2 ? ' <span style="color:var(--muted);font-size:11px;">(small sample — 2 shows on file at this venue)</span>' : ''}</div>`;
+      }).join('');
+  } else if (state.compareArtists.length >= 2) {
+    venueBlock = `<div class="venue-match-note">No shared venues among these artists yet, so this falls back to a weaker basis — each artist's overall peak/average across all their own shows, rather than a same-venue matchup.</div>`;
+  }
+
   const perArtist = state.compareArtists.map((artist, i) => {
     const shows = rows.filter(x => x.r.artist === artist && x.v !== null && x.v !== undefined);
     if (!shows.length) {
@@ -620,7 +664,7 @@ function renderComparisonSummary() {
   }
 
   el.style.display = 'block';
-  el.innerHTML = `<p class="section-title">Comparison summary</p>${lines}${takeaway}`;
+  el.innerHTML = `<p class="section-title">Comparison summary</p>${venueBlock}${lines}${takeaway}`;
 }
 
 function sortRows(rows, key, dir) {

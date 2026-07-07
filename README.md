@@ -60,6 +60,30 @@ same day, that update won't trigger a second Slack post — a known simplificati
 commentary during the workday depends on someone having the app open on their machine during
 that window — it isn't a server running independently in the background.
 
+### Benchmarking methodology
+
+Both the scheduled sync's Claude-written commentary and the dashboard's instant on-page compare
+panel follow the same comparison-basis priority, so a "benchmark" here means something specific
+rather than just an average of whatever's on file:
+
+1. **Venue match first.** Different artists who played the *same venue* are the strongest
+   comparison — it holds city, capacity, and local market constant. The instant compare panel
+   surfaces these as "Strongest comparison basis" matchups when 2+ selected artists share a
+   venue; the scheduled sync's commentary does the same when writing early-read/general insights.
+2. **Then sales stage, time window, and report type.** Within a same-venue comparison, +24h EDP
+   views are compared to +24h EDP views (not +72h), presale queue to presale queue, etc.
+3. **Artist/genre/audience/market similarity as a fallback**, only used when same-venue history
+   is too thin to say something concrete — and the commentary says so explicitly when it falls
+   back to this tier.
+
+The Claude-written commentary also: states its comparison basis whenever it's inferred (always
+true for an unattended job), calls out gaps/contradictions that limit a clean comparison (e.g.
+FR/IT's non-comparable queue systems, a single-data-point venue), and explicitly distinguishes a
+one-report observation from a small-sample comparison from a stronger multi-event pattern —
+it will not imply a trend from one number. It may use a sparing, disclosed web search to help
+pick sensible touring-peer comparisons when the report data alone doesn't make the set obvious,
+but outside context never overrides what the reports actually show.
+
 ## Dashboard features
 
 - **By show / By tour toggle** — "By show" is the original one-row-per-date view. "By tour"
