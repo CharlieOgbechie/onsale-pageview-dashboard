@@ -1,0 +1,107 @@
+{
+  "generated_at": "2026-07-07T11:39:42Z",
+  "insights": [
+    {
+      "headline": "BTS EU/UK 2026 is the dominant tour in this sync, but pacing slightly below their 2023 stadium benchmark",
+      "detail": "BTS's Tottenham Hotspur Stadium dates hit onsale queues of 195,640 (6 Jul) and 177,873 (7 Jul), and EDP views reached 202,249 at +72h on the first date. That's just under the 220,249 onsale queue recorded for BTS's prior Tottenham date in the venue baseline, and well within the venue's historic 220k-533k megastar range but at the low end of it. Munich's Allianz Arena onsale queue (185,701 and 128,067 across two dates) far exceeds the single 2023 K-pop reference point on file for that venue.",
+      "related_ids": [
+        "bts-tottenham-hotspur-stadium-london-2026-07-06",
+        "bts-releases-tottenham-hotspur-stadium-london-2026-07-06",
+        "bts-releases-tottenham-hotspur-stadium-london-2026-07-07",
+        "bts-date-1-tottenham-hotspur-stadium-2026",
+        "bts-allianz-arena-munich-2026-07-11"
+      ]
+    },
+    {
+      "headline": "Data quality flag: BTS Munich EDP figure looks like a spreadsheet error, not real demand",
+      "detail": "The BTS Allianz Arena Munich show on 11 Jul jumps from 30,507 EDP views at +24h to 240,493 at +48h - an ~8x jump with no equivalent spike anywhere else in this sync (typical +24h to +48h growth across all other shows is 1.3x-2x). Recommend checking the source cell before using this figure in any downstream reporting.",
+      "related_ids": [
+        "bts-allianz-arena-munich-2026-07-11"
+      ]
+    },
+    {
+      "headline": "Copy-paste error: Pussycat Dolls' Oslo date is labelled with a Barcelona venue",
+      "detail": "The Pussycat Dolls UK/EU 2026 tracker lists the 10 Sep Oslo show's venue as 'Palau Sant Jordi', which is actually a Barcelona arena. City/country (Oslo, NO) are correct, so the venue field alone needs manual correction in the source sheet.",
+      "related_ids": [
+        "pussycat-dolls-oslo-2026-09-10"
+      ]
+    },
+    {
+      "headline": "JAY-Z's single Stade de France date has by far the highest presale figure captured this sync",
+      "detail": "JAY-Z's 10 Sep 2026 Stade de France show shows a presale queue of 200,100 - more than any other presale figure extracted in this run, including BTS and Bad Bunny. Caveat: Stade de France runs France's non-comparable 'active users' sign-up system rather than UK/NL SmartQueue, so this isn't directly comparable to queue figures elsewhere, but it's still a striking standalone number for a single-date show.",
+      "related_ids": [
+        "jay-z-stade-de-france-paris-2026-09-10"
+      ]
+    },
+    {
+      "headline": "JOJI's EU/UK 2026 tour is pacing very low across all 12 dates",
+      "detail": "Peak onsale queues across JOJI's full run stay under 300 at every stop (Amsterdam highest at 297; Zurich lowest at 13), and most presale queues are in the low hundreds to low thousands. This matches the 'low demand'/'low but quick clear' pattern already on file for JOJI's Co-op Live and O2 shows in the venue baseline - Manchester's figures (612 presale / 156 onsale) match the historic baseline for that show exactly, which is a good cross-validation signal.",
+      "related_ids": [
+        "joji-dublin-2026-08-11",
+        "joji-london-2026-08-13",
+        "joji-manchester-2026-08-16",
+        "joji-zurich-2026-08-31",
+        "joji-co-op-live-2026"
+      ]
+    },
+    {
+      "headline": "Harry Styles' Wembley opener matches his prior benchmark almost exactly",
+      "detail": "The 12 Jun 2026 Wembley Stadium date posted 336,232 EDP views at +72h - identical to the 'date 1' Wembley figure already recorded in the venue baseline for Harry Styles, a strong consistency check between the two data sources. Demand then fell off steeply on subsequent London dates (173,906 on 13 Jun, down to 60,364-94,975 on the later June dates).",
+      "related_ids": [
+        "harry-styles-wembley-stadium-london-2026-06-12",
+        "harry-styles-date-1-wembley-stadium-2026",
+        "harry-styles-wembley-stadium-london-2026-06-13"
+      ]
+    },
+    {
+      "headline": "Data quality flag: Xdinary Heroes figures look like a copied KATSEYE tracker template",
+      "detail": "Three Xdinary Heroes shows (O2 Ritz Manchester, O2 Forum Kentish Town, and Batschkapp Frankfurt) have EDP/ADP figures that are numerically identical, row for row, to KATSEYE's figures at the exact same venues and dates in a separate sheet. This looks like a shared/duplicated tracker template rather than three independently observed shows - worth flagging to whoever owns the Xdinary Heroes sheet.",
+      "related_ids": [
+        "xdinary-heroes-o2-ritz-manchester-2026-05-31",
+        "xdinary-heroes-o2-forum-kentish-town-london-2026-06-02",
+        "xdinary-heroes-batschkapp-frankfurt-2026-06-07"
+      ]
+    },
+    {
+      "headline": "Bad Bunny's Riyadh Air Metropolitano residency is tracked across two separate reports with different metrics",
+      "detail": "The same Madrid residency dates (e.g. 30 May, 31 May, 2-15 Jun) appear in both the original 'Los Vecinos/Prod Releases' tracker (hourly EDP/ADP buckets) and a separate 'Additional Seats' tracker (date-range windows around the Grammys and the additional-seat release). Both were kept as distinct records since they capture genuinely different onsale events for the same show dates, but anyone building a single per-show total should be aware there are two entries per date.",
+      "related_ids": [
+        "bad-bunny-riyadh-air-metropolitano-madrid-2026-05-30--bad-bunny-uk-eu-los-vecinos-prod-release",
+        "bad-bunny-riyadh-air-metropolitano-madrid-2026-05-30--bad-bunny-additional-seats-emea-2026-tou"
+      ]
+    },
+    {
+      "headline": "Don Toliver: two shows have ADP figures implausibly higher than EDP",
+      "detail": "Olympiahalle Munich (29 Oct) and Uber Arena Berlin (2 Nov) both show artist-page (ADP) views well above ticket-page (EDP) views for the same show - the reverse of every other row in the sheet. This lines up with a likely column-alignment issue in the per-market ADP block (country-code columns appear offset from their venue rows) rather than genuine demand.",
+      "related_ids": [
+        "don-toliver-olympiahalle-munich-2026-10-29",
+        "don-toliver-uber-arena-berlin-2026-11-02"
+      ]
+    },
+    {
+      "headline": "Bruno Mars' two biggest EMEA stadium dates (Paris, Milan) have no view or queue data at all",
+      "detail": "Stade de France (20-21 Jun) and Stadio San Siro (14 Jul) are both blank in the source tracker - no EDP, ADP, presale, or onsale figures were captured for either date, despite these being two of the largest-capacity stops on the EMEA 2026 tour. Worth a follow-up with whoever owns that tracker, since every other Bruno Mars date has at least partial figures.",
+      "related_ids": [
+        "bruno-mars-stade-de-france-paris-2026-06-20",
+        "bruno-mars-stade-de-france-paris-2026-06-21",
+        "bruno-mars-stadio-san-siro-milan-2026-07-14"
+      ]
+    },
+    {
+      "headline": "The long-standing 'mystery Hilary Duff' anomaly in the baseline data is now resolved",
+      "detail": "Earlier baseline data flagged several UK/IE shows as an 'unknown artist mislabeled Hilary Duff' anomaly. This sync's read of the actual 'Hilary Duff - UK Arena Tour 2026' source file confirms these are genuine Hilary Duff shows - a coherent 5-city run (Dublin, Cardiff, London, Manchester, Glasgow). A comparable-reference copy of the Dublin date pasted into The Strokes' tracker shows matching EDP figures (986/2,818/4,033/5,796/8,865 across the +3h to +96h buckets), giving good cross-source validation.",
+      "related_ids": [
+        "hilary-duff-dublin-2026-09-06",
+        "hilary-duff-3arena-dublin-2026-09-06",
+        "unknown-artist-mislabeled-hilary-duff-the-o2-2026"
+      ]
+    },
+    {
+      "headline": "NE-YO & AKON is the most thoroughly-tracked headliner tour in this sync",
+      "detail": "27 individual show records were extracted from the NE-YO & AKON UK/EU 2026 tracker, the largest per-tour dataset captured this run. That breadth makes it a good candidate as a reference tour for future headliner-tier venue benchmarking, once figures are reviewed for consistency.",
+      "related_ids": [
+        "ne-yo-akon-the-o2-2026"
+      ]
+    }
+  ]
+}

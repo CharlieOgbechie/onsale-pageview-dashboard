@@ -155,6 +155,26 @@
     color: var(--muted);
     line-height: 1.5;
   }
+  .view-toggle { display: flex; gap: 6px; margin-bottom: 14px; }
+  .view-toggle button {
+    background: var(--panel-2);
+    border: 1px solid var(--border);
+    color: var(--muted);
+    border-radius: 6px;
+    padding: 7px 14px;
+    font-size: 13px;
+    cursor: pointer;
+  }
+  .view-toggle button.active {
+    background: var(--accent);
+    border-color: var(--accent);
+    color: #0f1115;
+    font-weight: 600;
+  }
+  .pace-ahead { color: var(--good); font-weight: 600; }
+  .pace-below { color: var(--bad); font-weight: 600; }
+  .pace-onpar { color: var(--accent-2); font-weight: 600; }
+  .pace-unknown { color: var(--muted); }
 </style>
 </head>
 <body>
@@ -170,6 +190,11 @@
 <main>
   <div class="panel">
     <p class="section-title">Compare shows</p>
+
+    <div class="view-toggle">
+      <button type="button" id="viewShowBtn" class="active">By show</button>
+      <button type="button" id="viewTourBtn">By tour</button>
+    </div>
 
     <div class="compare-picker">
       <span class="compare-hint">Compare artists:</span>
@@ -195,6 +220,12 @@
         <option value="rising">Rising / Niche</option>
       </select>
       <select id="yearSelect"><option value="">All years</option></select>
+      <select id="venueTypeSelect">
+        <option value="">All venue types</option>
+        <option value="stadium">Stadium (40k+ cap)</option>
+        <option value="arena">Arena (8k-40k cap)</option>
+        <option value="theatre_club">Theatre &amp; club (&lt;8k cap)</option>
+      </select>
       <label style="display:flex;align-items:center;gap:6px;font-size:13px;color:var(--muted);">
         <input type="checkbox" id="excludeAnomalies" checked style="width:auto;" /> exclude anomalies
       </label>
@@ -203,21 +234,9 @@
 
     <div id="comparisonSummary" class="panel comparison-summary" style="display:none;"></div>
 
-    <p class="section-title" style="margin-top:24px;">All shows</p>
+    <p class="section-title" id="tableTitle" style="margin-top:24px;">All shows</p>
     <table id="dataTable">
-      <thead>
-        <tr>
-          <th data-key="artist">Artist</th>
-          <th data-key="venue">Venue</th>
-          <th data-key="city">City</th>
-          <th data-key="year">Year</th>
-          <th data-key="tier">Tier</th>
-          <th data-key="edp">EDP views</th>
-          <th data-key="adp">ADP views</th>
-          <th data-key="presale_peak_queue">Presale Q</th>
-          <th data-key="onsale_peak_queue">Onsale Q</th>
-        </tr>
-      </thead>
+      <thead><tr></tr></thead>
       <tbody></tbody>
     </table>
   </div>
@@ -229,13 +248,27 @@
 </main>
 
 <script>
-const state = { onsales: [], insights: null, sort: { key: 'edp', dir: 'desc' }, compareArtists: [] };
+const state = {
+  onsales: [],
+  insights: null,
+  sort: { key: 'edp', dir: 'desc' },
+  compareArtists: [],
+  viewMode: 'show', // 'show' | 'tour'
+  venueMap: {}, // lowercase venue name -> { capacity, venue_type }
+};
 const COMPARE_PALETTE = ['#6ea8fe', '#f2b84b', '#4fd18b', '#f27272', '#c792ea'];
 const MAX_COMPARE = 5;
+const PACE_AHEAD_THRESHOLD = 1.15; // 15% above venue average
+const PACE_BELOW_THRESHOLD = 0.85; // 15% below venue average
 
 function artistColor(artist) {
   const idx = state.compareArtists.indexOf(artist);
   return idx === -1 ? '#6ea8fe' : COMPARE_PALETTE[idx % COMPARE_PALETTE.length];
+}
+
+function getVenueType(record) {
+  const info = state.venueMap[(record.venue || '').toLowerCase().trim()];
+  return info ? info.venue_type : 'unknown';
 }
 
 function maxHourKey(record, field) {
@@ -292,6 +325,7 @@ function filteredRecords() {
   const q = document.getElementById('searchBox').value.trim().toLowerCase();
   const tier = document.getElementById('tierSelect').value;
   const year = document.getElementById('yearSelect').value;
+  const venueType = document.getElementById('venueTypeSelect').value;
   const excludeAnomalies = document.getElementById('excludeAnomalies').checked;
   const comparing = state.compareArtists.length > 0;
   return state.onsales.filter(r => {
@@ -299,6 +333,7 @@ function filteredRecords() {
     if (r.is_comparable_reference) return false;
     if (tier && r.tier !== tier) return false;
     if (year && String(r.year) !== year) return false;
+    if (venueType && getVenueType(r) !== venueType) return false;
     if (comparing) {
       return state.compareArtists.includes(r.artist);
     }
@@ -307,6 +342,86 @@ function filteredRecords() {
       if (!hay.includes(q)) return false;
     }
     return true;
+  });
+}
+
+// --- Pacing: how a show's numbers compare to the historical average for
+// that same venue (computed from all other non-anomalous shows at that
+// venue in the dataset), independent of whatever filters are active. ---
+function venueAverage(venueName, metric, hour, excludeId) {
+  const peers = state.onsales.filter(r =>
+    r.venue === venueName && !r.anomaly && !r.is_comparable_reference && r.id !== excludeId
+  );
+  const vals = peers.map(r => metricValue(r, metric, hour)).filter(v => v !== null && v !== undefined);
+  if (!vals.length) return null;
+  return { avg: vals.reduce((a, b) => a + b, 0) / vals.length, count: vals.length };
+}
+
+function pacingFor(record, metric, hour) {
+  const value = metricValue(record, metric, hour);
+  if (value === null || value === undefined) return null;
+  const stats = venueAverage(record.venue, metric, hour, record.id);
+  if (!stats) return { symbol: '—', cls: 'pace-unknown', label: `Not enough other ${record.venue} shows yet to compare against` };
+  const ratio = stats.avg > 0 ? value / stats.avg : null;
+  if (ratio === null) return { symbol: '—', cls: 'pace-unknown', label: 'n/a' };
+  if (ratio >= PACE_AHEAD_THRESHOLD) {
+    return { symbol: '▲', cls: 'pace-ahead', label: `${Math.round((ratio - 1) * 100)}% above the ${record.venue} average (n=${stats.count})` };
+  }
+  if (ratio <= PACE_BELOW_THRESHOLD) {
+    return { symbol: '▼', cls: 'pace-below', label: `${Math.round((1 - ratio) * 100)}% below the ${record.venue} average (n=${stats.count})` };
+  }
+  return { symbol: '●', cls: 'pace-onpar', label: `Within 15% of the ${record.venue} average (n=${stats.count})` };
+}
+
+function tourKeyFor(r) {
+  return r.tour || `${r.artist} (${r.year || 'unknown year'})`;
+}
+
+function avgOf(arr) {
+  const vals = arr.filter(v => v !== null && v !== undefined);
+  return vals.length ? vals.reduce((a, b) => a + b, 0) / vals.length : null;
+}
+
+function mostCommon(arr) {
+  const counts = {};
+  arr.forEach(v => { counts[v] = (counts[v] || 0) + 1; });
+  return Object.entries(counts).sort((a, b) => b[1] - a[1])[0][0];
+}
+
+function aggregateTours(rows, metric, hour) {
+  const groups = new Map();
+  rows.forEach(r => {
+    const key = tourKeyFor(r);
+    if (!groups.has(key)) groups.set(key, { key, artist: r.artist, shows: [] });
+    groups.get(key).shows.push(r);
+  });
+  return [...groups.values()].map(g => {
+    const valued = g.shows
+      .map(r => ({ r, v: metricValue(r, metric, hour), pacing: pacingFor(r, metric, hour) }))
+      .filter(x => x.v !== null && x.v !== undefined);
+    const venues = [...new Set(g.shows.map(r => r.venue))];
+    const total = valued.reduce((s, x) => s + x.v, 0);
+    const avg = valued.length ? total / valued.length : null;
+    const tiers = g.shows.map(r => r.tier).filter(Boolean);
+    const paceCounts = { ahead: 0, below: 0, onpar: 0, unknown: 0 };
+    valued.forEach(x => {
+      if (!x.pacing || x.pacing.cls === 'pace-unknown') paceCounts.unknown++;
+      else if (x.pacing.cls === 'pace-ahead') paceCounts.ahead++;
+      else if (x.pacing.cls === 'pace-below') paceCounts.below++;
+      else paceCounts.onpar++;
+    });
+    return {
+      key: g.key,
+      artist: g.artist,
+      showCount: g.shows.length,
+      venues,
+      total,
+      avg,
+      avgPresale: avgOf(g.shows.map(r => r.presale_peak_queue)),
+      avgOnsale: avgOf(g.shows.map(r => r.onsale_peak_queue)),
+      tier: tiers.length ? mostCommon(tiers) : null,
+      paceCounts,
+    };
   });
 }
 
@@ -356,24 +471,39 @@ function renderChart() {
   const metric = document.getElementById('metricSelect').value;
   const hour = document.getElementById('hourSelect').value;
   const comparing = state.compareArtists.length > 0;
-  const rows = filteredRecords()
-    .map(r => ({ r, v: metricValue(r, metric, hour) }))
-    .filter(x => x.v !== null && x.v !== undefined)
-    .sort((a, b) => b.v - a.v)
-    .slice(0, comparing ? 40 : 15);
+  const metricLabel = document.getElementById('metricSelect').selectedOptions[0].textContent;
+
+  let labels, data, colors, axisLabel;
+
+  if (state.viewMode === 'tour') {
+    const tours = aggregateTours(filteredRecords(), metric, hour)
+      .filter(t => t.total > 0)
+      .sort((a, b) => b.total - a.total)
+      .slice(0, comparing ? 40 : 15);
+    labels = tours.map(t => t.key);
+    data = tours.map(t => t.total);
+    colors = tours.map(t => comparing ? artistColor(t.artist) : '#6ea8fe');
+    axisLabel = `Total ${metricLabel}`;
+  } else {
+    const rows = filteredRecords()
+      .map(r => ({ r, v: metricValue(r, metric, hour) }))
+      .filter(x => x.v !== null && x.v !== undefined)
+      .sort((a, b) => b.v - a.v)
+      .slice(0, comparing ? 40 : 15);
+    labels = rows.map(x => `${x.r.artist} — ${x.r.venue}`);
+    data = rows.map(x => x.v);
+    colors = rows.map(x => comparing ? artistColor(x.r.artist) : '#6ea8fe');
+    axisLabel = metricLabel;
+  }
 
   const ctx = document.getElementById('mainChart').getContext('2d');
-  const labels = rows.map(x => `${x.r.artist} — ${x.r.venue}`);
-  const data = rows.map(x => x.v);
-  const colors = rows.map(x => comparing ? artistColor(x.r.artist) : '#6ea8fe');
-
   if (chart) chart.destroy();
   chart = new Chart(ctx, {
     type: 'bar',
     data: {
       labels,
       datasets: [{
-        label: document.getElementById('metricSelect').selectedOptions[0].textContent,
+        label: axisLabel,
         data,
         backgroundColor: colors,
         borderRadius: 4,
@@ -450,22 +580,60 @@ function renderComparisonSummary() {
   el.innerHTML = `<p class="section-title">Comparison summary</p>${lines}${takeaway}`;
 }
 
-function renderTable() {
-  const tbody = document.querySelector('#dataTable tbody');
-  const hour = document.getElementById('hourSelect').value;
-  let rows = filteredRecords().map(r => ({
-    ...r,
-    edp: valueAtHour(r, 'edp_views_by_hour', hour),
-    adp: valueAtHour(r, 'adp_views_by_hour', hour),
-  }));
-  const { key, dir } = state.sort;
-  rows.sort((a, b) => {
+function sortRows(rows, key, dir) {
+  return rows.slice().sort((a, b) => {
     let av = a[key], bv = b[key];
     if (av === null || av === undefined) av = -Infinity;
     if (bv === null || bv === undefined) bv = -Infinity;
     if (typeof av === 'string') return dir === 'asc' ? av.localeCompare(bv) : bv.localeCompare(av);
     return dir === 'asc' ? av - bv : bv - av;
   });
+}
+
+function bindSortHeaders() {
+  document.querySelectorAll('#dataTable th[data-key]').forEach(th => {
+    th.addEventListener('click', () => {
+      const key = th.dataset.key;
+      if (state.sort.key === key) state.sort.dir = state.sort.dir === 'asc' ? 'desc' : 'asc';
+      else state.sort = { key, dir: 'desc' };
+      renderTable();
+    });
+  });
+}
+
+function renderShowTable() {
+  const hour = document.getElementById('hourSelect').value;
+  const metric = document.getElementById('metricSelect').value;
+  document.getElementById('tableTitle').textContent = 'All shows';
+  document.querySelector('#dataTable thead tr').innerHTML = `
+    <th data-key="artist">Artist</th>
+    <th data-key="venue">Venue</th>
+    <th data-key="city">City</th>
+    <th data-key="year">Year</th>
+    <th data-key="tier">Tier</th>
+    <th data-key="edp">EDP views</th>
+    <th data-key="adp">ADP views</th>
+    <th data-key="presale_peak_queue">Presale Q</th>
+    <th data-key="onsale_peak_queue">Onsale Q</th>
+    <th data-key="paceRatio">Pacing</th>
+  `;
+  bindSortHeaders();
+
+  let rows = filteredRecords().map(r => {
+    const pacing = pacingFor(r, metric, hour);
+    return {
+      ...r,
+      edp: valueAtHour(r, 'edp_views_by_hour', hour),
+      adp: valueAtHour(r, 'adp_views_by_hour', hour),
+      pacing,
+      paceRatio: pacing && pacing.cls !== 'pace-unknown' ? (pacing.cls === 'pace-ahead' ? 2 : pacing.cls === 'pace-onpar' ? 1 : 0) : -1,
+    };
+  });
+
+  const { key, dir } = state.sort;
+  rows = sortRows(rows, key, dir);
+
+  const tbody = document.querySelector('#dataTable tbody');
   tbody.innerHTML = rows.map(r => `
     <tr>
       <td>${r.artist}${r.anomaly ? ' <span class="badge anomaly-badge">anomaly</span>' : ''}</td>
@@ -477,18 +645,68 @@ function renderTable() {
       <td>${fmt(r.adp)}</td>
       <td>${fmt(r.presale_peak_queue)}</td>
       <td>${fmt(r.onsale_peak_queue)}</td>
+      <td class="${r.pacing ? r.pacing.cls : ''}" title="${r.pacing ? r.pacing.label : ''}">${r.pacing ? r.pacing.symbol : '—'}</td>
     </tr>
-  `).join('') || '<tr><td colspan="9" class="empty">No shows match these filters.</td></tr>';
+  `).join('') || '<tr><td colspan="10" class="empty">No shows match these filters.</td></tr>';
+}
+
+function renderTourTable() {
+  const hour = document.getElementById('hourSelect').value;
+  const metric = document.getElementById('metricSelect').value;
+  const metricLabel = document.getElementById('metricSelect').selectedOptions[0].textContent;
+  document.getElementById('tableTitle').textContent = 'All tours';
+  document.querySelector('#dataTable thead tr').innerHTML = `
+    <th data-key="artist">Tour / artist</th>
+    <th data-key="showCount">Shows</th>
+    <th>Venues</th>
+    <th data-key="tier">Tier</th>
+    <th data-key="total">Total ${metricLabel}</th>
+    <th data-key="avg">Avg ${metricLabel}</th>
+    <th data-key="avgPresale">Avg presale Q</th>
+    <th data-key="avgOnsale">Avg onsale Q</th>
+    <th>Pacing (shows)</th>
+  `;
+  bindSortHeaders();
+
+  let tours = aggregateTours(filteredRecords(), metric, hour);
+  const { key, dir } = state.sort;
+  const sortKey = ['artist', 'showCount', 'tier', 'total', 'avg', 'avgPresale', 'avgOnsale'].includes(key) ? key : 'total';
+  tours = sortRows(tours, sortKey, sortKey === key ? dir : 'desc');
+
+  const tbody = document.querySelector('#dataTable tbody');
+  tbody.innerHTML = tours.map(t => `
+    <tr>
+      <td>${t.artist}${t.key !== t.artist ? `<br><span class="badge">${t.key}</span>` : ''}</td>
+      <td>${t.showCount}</td>
+      <td title="${t.venues.join(', ')}">${t.venues.slice(0, 2).join(', ')}${t.venues.length > 2 ? ` +${t.venues.length - 2} more` : ''}</td>
+      <td class="tier-${t.tier || ''}">${t.tier || '—'}</td>
+      <td>${fmt(Math.round(t.total))}</td>
+      <td>${fmt(t.avg !== null ? Math.round(t.avg) : null)}</td>
+      <td>${fmt(t.avgPresale !== null ? Math.round(t.avgPresale) : null)}</td>
+      <td>${fmt(t.avgOnsale !== null ? Math.round(t.avgOnsale) : null)}</td>
+      <td>
+        <span class="pace-ahead">▲${t.paceCounts.ahead}</span>
+        <span class="pace-onpar">●${t.paceCounts.onpar}</span>
+        <span class="pace-below">▼${t.paceCounts.below}</span>
+      </td>
+    </tr>
+  `).join('') || '<tr><td colspan="9" class="empty">No tours match these filters.</td></tr>';
+}
+
+function renderTable() {
+  if (state.viewMode === 'tour') renderTourTable();
+  else renderShowTable();
 }
 
 function renderInsights() {
   const el = document.getElementById('insights');
   if (!state.insights || !state.insights.insights || !state.insights.insights.length) {
-    el.innerHTML = '<div class="empty">No precomputed insights yet — these are generated by Claude each time the scheduled sync runs. Once the GitHub Action has run at least once, they\'ll show up here.</div>';
+    el.innerHTML = '<div class="empty">No precomputed insights yet — these are generated by Claude each time the scheduled sync runs (currently daily). Once it has run at least once and the results are pushed to GitHub, they\'ll show up here.</div>';
     return;
   }
   el.innerHTML = state.insights.insights.map(i => `
-    <div class="insight">
+    <div class="insight" ${i.category === 'early_read' ? 'style="border-left-color: var(--accent-2);"' : ''}>
+      ${i.category === 'early_read' ? '<span class="badge" style="border-color: var(--accent-2); color: var(--accent-2); margin-bottom:6px; display:inline-block;">Early read · 12–24h</span><br>' : ''}
       <h4>${i.headline}</h4>
       <p>${i.detail}</p>
     </div>
@@ -516,18 +734,19 @@ compareInput.addEventListener('change', () => {
   if (ok) compareInput.value = '';
 });
 
-document.querySelectorAll('#dataTable th').forEach(th => {
-  th.addEventListener('click', () => {
-    const key = th.dataset.key;
-    if (state.sort.key === key) state.sort.dir = state.sort.dir === 'asc' ? 'desc' : 'asc';
-    else state.sort = { key, dir: 'desc' };
-    renderTable();
-  });
-});
-
-['searchBox', 'metricSelect', 'hourSelect', 'tierSelect', 'yearSelect', 'excludeAnomalies'].forEach(id => {
+['searchBox', 'metricSelect', 'hourSelect', 'tierSelect', 'yearSelect', 'venueTypeSelect', 'excludeAnomalies'].forEach(id => {
   document.getElementById(id).addEventListener('input', renderAll);
 });
+
+function setViewMode(mode) {
+  state.viewMode = mode;
+  document.getElementById('viewShowBtn').classList.toggle('active', mode === 'show');
+  document.getElementById('viewTourBtn').classList.toggle('active', mode === 'tour');
+  state.sort = mode === 'tour' ? { key: 'total', dir: 'desc' } : { key: 'edp', dir: 'desc' };
+  renderAll();
+}
+document.getElementById('viewShowBtn').addEventListener('click', () => setViewMode('show'));
+document.getElementById('viewTourBtn').addEventListener('click', () => setViewMode('tour'));
 
 async function loadData() {
   try {
@@ -542,6 +761,16 @@ async function loadData() {
     state.insights = await res2.json();
   } catch (e) {
     state.insights = null;
+  }
+  try {
+    const res3 = await fetch('data/venue-baselines.json', { cache: 'no-store' });
+    const baselines = await res3.json();
+    state.venueMap = {};
+    baselines.forEach(v => {
+      state.venueMap[(v.venue || '').toLowerCase().trim()] = { capacity: v.capacity, venue_type: v.venue_type };
+    });
+  } catch (e) {
+    state.venueMap = {};
   }
 
   populateHourOptions();

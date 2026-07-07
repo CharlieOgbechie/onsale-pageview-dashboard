@@ -253,11 +253,26 @@ def slugify(s):
 
 def generate_insights_with_claude(client, onsales, baselines):
     system = """You are a demand analyst for a ticketing company. Given normalized onsale \
-page-view/queue records and venue benchmark bands, write a short list of precomputed insights \
-for a dashboard. Focus on: which shows are pacing above/below their venue's typical benchmark, \
-notable anomalies, and useful cross-show comparisons. Be concise and concrete, cite numbers. \
-Return ONLY a JSON array of objects: {"headline": string, "detail": string, "related_ids": [string]} \
-Return at most 12 insights, ranked by how notable they are."""
+page-view/queue records and venue benchmark bands (including each venue's `venue_type`: \
+stadium/arena/theatre_club), write a short list of precomputed insights for a dashboard.
+
+Write two kinds, tagged via "category":
+
+"early_read" -- for shows whose most recent available data point is only the +12h or +24h \
+bucket (no +48h/+72h/+96h yet, meaning it's within its first day post-announcement). Compare \
+that show's numbers at that hour mark against (a) the historical average for OTHER shows at the \
+same venue, and (b) 2-3 peer artists playing venues of the same venue_type/similar tier, naming \
+them explicitly with numbers. Skip a show if there isn't enough comparable data to say something \
+concrete.
+
+"general" -- shows pacing above/below their venue's typical benchmark at later stages, notable \
+anomalies, useful cross-show/cross-tour comparisons.
+
+Be concise and concrete, cite numbers. Put early_read insights first when any exist, since \
+they're the most time-sensitive for the tour team.
+Return ONLY a JSON array of objects: \
+{"headline": string, "detail": string, "category": "early_read" | "general", "related_ids": [string]} \
+Return at most 14 insights, ranked by how notable they are."""
 
     payload = {"onsales": onsales, "venue_baselines": baselines}
     msg = client.messages.create(
