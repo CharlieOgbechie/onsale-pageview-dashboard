@@ -1,0 +1,416 @@
+[
+  {
+    "venue": "The O2",
+    "city": "London",
+    "capacity_note": "~20,000 cap",
+    "presale_peak_queue_range": "~1.5k-17k (headliner tier); ~4-4.5k (superstar without stadium-level demand)",
+    "onsale_peak_queue_range": "~235-22k (wide range; Pussycat Dolls outlier at 22k; typical headliner 1-8k)",
+    "edp_visits_range": "~11k-168k depending on tier",
+    "sample_size": 9
+  },
+  {
+    "venue": "Wembley Stadium",
+    "city": "London",
+    "capacity_note": "~90,000 cap",
+    "presale_peak_queue_range": "300k-400k (megastar, first dates); 100-280k (roll/additional dates)",
+    "onsale_peak_queue_range": "50k-150k",
+    "edp_visits_range": "10k-340k (date 1 highest)",
+    "sample_size": 5
+  },
+  {
+    "venue": "Tottenham Hotspur Stadium",
+    "city": "London",
+    "capacity_note": "~62,000 cap",
+    "presale_peak_queue_range": "n/a (megastar onsale 220k-533k general for extraordinary events)",
+    "onsale_peak_queue_range": "220k-533k general (extraordinary events)",
+    "edp_visits_range": "~120k-202k",
+    "sample_size": 4
+  },
+  {
+    "venue": "Co-op Live",
+    "city": "Manchester",
+    "capacity_note": "~23,500 cap",
+    "presale_peak_queue_range": "600-11k (headliner/rising range)",
+    "onsale_peak_queue_range": "~150-6k (few data points; Pussycat Dolls strong)",
+    "edp_visits_range": "~4-234k (The Strokes very high EDP vs queue mismatch)",
+    "sample_size": 6
+  },
+  {
+    "venue": "OVO Hydro",
+    "city": "Glasgow",
+    "capacity_note": "~14,300 cap",
+    "presale_peak_queue_range": "~500-3.6k (thin data; 2-3.5k typical for established acts)",
+    "onsale_peak_queue_range": "sparse — ~77 to n/a (too few data points to benchmark reliably)",
+    "edp_visits_range": "n/a",
+    "sample_size": 6
+  },
+  {
+    "venue": "AO Arena",
+    "city": "Manchester",
+    "capacity_note": "~21,000 cap",
+    "presale_peak_queue_range": "~2.8k (ZAYN, lower end headliner/rising)",
+    "onsale_peak_queue_range": "n/a (very limited data)",
+    "edp_visits_range": "n/a",
+    "sample_size": 2
+  },
+  {
+    "venue": "Utilita Arena",
+    "city": "Birmingham",
+    "capacity_note": "~15,800 cap",
+    "presale_peak_queue_range": "~2.5k (ZAYN as only data point)",
+    "onsale_peak_queue_range": "n/a (very limited queue data)",
+    "edp_visits_range": "n/a",
+    "sample_size": 3
+  },
+  {
+    "venue": "Utilita Arena",
+    "city": "Cardiff",
+    "capacity_note": "~8,000 cap",
+    "presale_peak_queue_range": "n/a — single data point only; insufficient for benchmarking",
+    "onsale_peak_queue_range": "n/a — single data point only; insufficient for benchmarking",
+    "edp_visits_range": "n/a",
+    "sample_size": 1
+  },
+  {
+    "venue": "3Arena",
+    "city": "Dublin",
+    "capacity_note": "~14,500 cap",
+    "presale_peak_queue_range": "~450-2.2k (mostly sub-2k for non-megastar)",
+    "onsale_peak_queue_range": "~1-3.6k (only Strokes general captured)",
+    "edp_visits_range": "~9-16k (headliner tier)",
+    "sample_size": 7
+  },
+  {
+    "venue": "Aviva Stadium",
+    "city": "Dublin",
+    "capacity_note": "~51,700 cap",
+    "presale_peak_queue_range": "~13k (Dua Lipa single data point)",
+    "onsale_peak_queue_range": "~12k (Dua Lipa single data point)",
+    "edp_visits_range": "~15-40k per date at Taylor Swift level (megastar)",
+    "sample_size": 2
+  },
+  {
+    "venue": "Anfield",
+    "city": "Liverpool",
+    "capacity_note": "~54,000 cap",
+    "presale_peak_queue_range": "~17k (Dua Lipa single data point)",
+    "onsale_peak_queue_range": "~16k (Dua Lipa single data point)",
+    "edp_visits_range": "n/a",
+    "sample_size": 2
+  },
+  {
+    "venue": "BT Murrayfield",
+    "city": "Edinburgh",
+    "capacity_note": "~67,144 cap",
+    "presale_peak_queue_range": "65k cleared fast (megastar only)",
+    "onsale_peak_queue_range": "n/a",
+    "edp_visits_range": "~77k (date 1)",
+    "sample_size": 2
+  },
+  {
+    "venue": "Principality Stadium",
+    "city": "Cardiff",
+    "capacity_note": "~74,500 cap",
+    "presale_peak_queue_range": "n/a (megastar only)",
+    "onsale_peak_queue_range": "n/a (megastar only)",
+    "edp_visits_range": "n/a",
+    "sample_size": 2
+  },
+  {
+    "venue": "Stadium of Light",
+    "city": "Sunderland",
+    "capacity_note": "~49,000 cap",
+    "presale_peak_queue_range": "n/a — single megastar data point only",
+    "onsale_peak_queue_range": "n/a — single megastar data point only",
+    "edp_visits_range": "n/a",
+    "sample_size": 1
+  },
+  {
+    "venue": "Johan Cruijff ArenA",
+    "city": "Amsterdam",
+    "capacity_note": "~55,000 cap",
+    "presale_peak_queue_range": "200-262k (megastar)",
+    "onsale_peak_queue_range": "15-83k (megastar; wide range — Harry Styles date 2 lower as 'roll')",
+    "edp_visits_range": "n/a (no non-megastar data with queues; insufficient for lower tiers)",
+    "sample_size": 8
+  },
+  {
+    "venue": "Ziggo Dome",
+    "city": "Amsterdam",
+    "capacity_note": "~17,000 cap",
+    "presale_peak_queue_range": "headliner ~2-7.2k; superstar ~52k",
+    "onsale_peak_queue_range": "headliner ~1.2-6.6k; superstar ~74k",
+    "edp_visits_range": "headliner ~5-98k (The Strokes very high EDP vs moderate queue)",
+    "sample_size": 7
+  },
+  {
+    "venue": "Olympiahalle",
+    "city": "Munich",
+    "capacity_note": "~12,000 cap",
+    "presale_peak_queue_range": "superstar ~6-42k; headliner sparse",
+    "onsale_peak_queue_range": "superstar ~2-44k; headliner ~600-2.7k (thin data)",
+    "edp_visits_range": "~68k (superstar)",
+    "sample_size": 4
+  },
+  {
+    "venue": "Allianz Arena",
+    "city": "Munich",
+    "capacity_note": "~75,000 cap, stadium config",
+    "presale_peak_queue_range": "n/a — single megastar K-pop data point",
+    "onsale_peak_queue_range": "n/a — single megastar K-pop data point",
+    "edp_visits_range": "n/a",
+    "sample_size": 1
+  },
+  {
+    "venue": "Barclays Arena",
+    "city": "Hamburg",
+    "capacity_note": "~16,000 cap",
+    "presale_peak_queue_range": "~12k (single Dua Lipa data point)",
+    "onsale_peak_queue_range": "~4k (single Dua Lipa data point)",
+    "edp_visits_range": "n/a",
+    "sample_size": 1
+  },
+  {
+    "venue": "Lanxess Arena",
+    "city": "Cologne",
+    "capacity_note": "~20,000 cap",
+    "presale_peak_queue_range": "superstar ~5k; headliner ~1-4.1k",
+    "onsale_peak_queue_range": "superstar ~1.8k; headliner ~78-380 (thin/low)",
+    "edp_visits_range": "~55k (superstar)",
+    "sample_size": 4
+  },
+  {
+    "venue": "Uber Eats Music Hall",
+    "city": "Berlin",
+    "capacity_note": "~3,500 cap",
+    "presale_peak_queue_range": "headliner ~1-4.6k; superstar ~2.3k",
+    "onsale_peak_queue_range": "headliner ~1-5k (Strokes queue > venue cap; intense demand); superstar ~1k",
+    "edp_visits_range": "n/a",
+    "sample_size": 3
+  },
+  {
+    "venue": "PSD Bank Dome",
+    "city": "Dusseldorf",
+    "capacity_note": "~13,400 cap",
+    "presale_peak_queue_range": "n/a — insufficient data for reliable range",
+    "onsale_peak_queue_range": "n/a — insufficient data for reliable range",
+    "edp_visits_range": "n/a",
+    "sample_size": 2
+  },
+  {
+    "venue": "Deutsche Bank Park",
+    "city": "Frankfurt",
+    "capacity_note": "~58,000 cap stadium",
+    "presale_peak_queue_range": "n/a — single megastar data point",
+    "onsale_peak_queue_range": "n/a — single megastar data point",
+    "edp_visits_range": "n/a",
+    "sample_size": 1
+  },
+  {
+    "venue": "Olympiastadion / Olympic Stadium",
+    "city": "Berlin",
+    "capacity_note": "~74,000 cap",
+    "presale_peak_queue_range": "megastar ~138-214k",
+    "onsale_peak_queue_range": "megastar ~10-45k (Oasis low general = nearly sold in presale)",
+    "edp_visits_range": "~27-134k",
+    "sample_size": 2
+  },
+  {
+    "venue": "Volksparkstadion",
+    "city": "Hamburg",
+    "capacity_note": "~57,000 cap",
+    "presale_peak_queue_range": "n/a — single megastar data point; notably weaker than Frankfurt/Cologne",
+    "onsale_peak_queue_range": "n/a — single megastar data point; notably weaker than Frankfurt/Cologne",
+    "edp_visits_range": "n/a",
+    "sample_size": 1
+  },
+  {
+    "venue": "RheinEnergieStadion",
+    "city": "Cologne",
+    "capacity_note": "~50,000 cap",
+    "presale_peak_queue_range": "n/a — single megastar data point",
+    "onsale_peak_queue_range": "n/a — single megastar data point",
+    "edp_visits_range": "n/a",
+    "sample_size": 1
+  },
+  {
+    "venue": "Stade de France",
+    "city": "Paris",
+    "capacity_note": "~80,000 cap",
+    "presale_peak_queue_range": "FR sign-up/active-user system, not comparable to SmartQueue — no stated numeric benchmark range",
+    "onsale_peak_queue_range": "FR sign-up/active-user system, not comparable to SmartQueue — no stated numeric benchmark range",
+    "edp_visits_range": "n/a",
+    "sample_size": 5
+  },
+  {
+    "venue": "La Défense Arena",
+    "city": "Paris",
+    "capacity_note": "~40,000 cap",
+    "presale_peak_queue_range": "FR active users system — no stated benchmark range",
+    "onsale_peak_queue_range": "FR active users system — no stated benchmark range",
+    "edp_visits_range": "n/a",
+    "sample_size": 1
+  },
+  {
+    "venue": "Accor / Adidas Arena",
+    "city": "Paris",
+    "capacity_note": "~40,000 cap",
+    "presale_peak_queue_range": "FR system, different from UK/NL — no stated benchmark range",
+    "onsale_peak_queue_range": "FR system, different from UK/NL — no stated benchmark range",
+    "edp_visits_range": "n/a",
+    "sample_size": 3
+  },
+  {
+    "venue": "LDLC Arena",
+    "city": "Lyon",
+    "capacity_note": "~16,000 cap",
+    "presale_peak_queue_range": "FR active users; one queue both dates — no stated benchmark range",
+    "onsale_peak_queue_range": "FR active users; one queue both dates — no stated benchmark range",
+    "edp_visits_range": "n/a",
+    "sample_size": 1
+  },
+  {
+    "venue": "Estadio Shakira / Riyadh Air Metropolitano",
+    "city": "Madrid",
+    "capacity_note": "~68,000 cap",
+    "presale_peak_queue_range": "megastar ~60-125k; superstar residency ~47-109k (dates 2-3 very different)",
+    "onsale_peak_queue_range": "megastar ~57-86k; superstar residency ~7-49k (roll dates generate high general demand)",
+    "edp_visits_range": "~8-232k (BTS dominant)",
+    "sample_size": 7
+  },
+  {
+    "venue": "WiZink Center",
+    "city": "Madrid",
+    "capacity_note": "~18,000 cap",
+    "presale_peak_queue_range": "superstar ~37k (single Dua Lipa data point)",
+    "onsale_peak_queue_range": "superstar ~61k (single Dua Lipa data point; general > presale = strong organic demand)",
+    "edp_visits_range": "n/a",
+    "sample_size": 2
+  },
+  {
+    "venue": "Palau Sant Jordi",
+    "city": "Barcelona",
+    "capacity_note": "~17,000 cap",
+    "presale_peak_queue_range": "headliner ~6.3k",
+    "onsale_peak_queue_range": "headliner ~18k (strong general vs presale ratio)",
+    "edp_visits_range": "n/a (Strokes EDP very high at 139k vs modest presale)",
+    "sample_size": 3
+  },
+  {
+    "venue": "King Baudouin Stadium",
+    "city": "Brussels",
+    "capacity_note": "~50,000 cap",
+    "presale_peak_queue_range": "megastar ~47-59k",
+    "onsale_peak_queue_range": "megastar ~61-125k (Beyoncé exceptional general demand)",
+    "edp_visits_range": "~83k (BTS)",
+    "sample_size": 2
+  },
+  {
+    "venue": "Sportpaleis",
+    "city": "Antwerp",
+    "capacity_note": "~23,000 cap",
+    "presale_peak_queue_range": "superstar ~11k (single data point)",
+    "onsale_peak_queue_range": "superstar ~14-18k (single data point; general > presale)",
+    "edp_visits_range": "n/a",
+    "sample_size": 1
+  },
+  {
+    "venue": "ING Arena",
+    "city": "Brussels",
+    "capacity_note": "~22,000 cap",
+    "presale_peak_queue_range": "n/a — single data point; A$AP Rocky very low, likely not representative",
+    "onsale_peak_queue_range": "n/a — single data point; A$AP Rocky very low, likely not representative",
+    "edp_visits_range": "n/a",
+    "sample_size": 1
+  },
+  {
+    "venue": "Atlas Arena",
+    "city": "Lodz",
+    "capacity_note": "~15,000 cap",
+    "presale_peak_queue_range": "superstar ~7.8k (single data point)",
+    "onsale_peak_queue_range": "superstar ~4.8k (single data point)",
+    "edp_visits_range": "n/a",
+    "sample_size": 2
+  },
+  {
+    "venue": "PGE Narodowy",
+    "city": "Warsaw",
+    "capacity_note": "~58,000 cap stadium",
+    "presale_peak_queue_range": "n/a — single megastar data point",
+    "onsale_peak_queue_range": "n/a — single megastar data point",
+    "edp_visits_range": "n/a",
+    "sample_size": 1
+  },
+  {
+    "venue": "Royal Arena",
+    "city": "Copenhagen",
+    "capacity_note": "~16,000 cap",
+    "presale_peak_queue_range": "n/a",
+    "onsale_peak_queue_range": "headliner ~174-830 (very low; Copenhagen underperforms vs other markets for mid-tier)",
+    "edp_visits_range": "~2.4-2.9k (headliner tier)",
+    "sample_size": 4
+  },
+  {
+    "venue": "Oslo Spektrum / Unity Arena",
+    "city": "Oslo",
+    "capacity_note": "~6,000-9,000 cap",
+    "presale_peak_queue_range": "n/a — single data point",
+    "onsale_peak_queue_range": "~900 general (single data point; Oslo modest)",
+    "edp_visits_range": "n/a",
+    "sample_size": 1
+  },
+  {
+    "venue": "Hartwall Arena",
+    "city": "Helsinki",
+    "capacity_note": "~13,500 cap",
+    "presale_peak_queue_range": "headliner (strong local market) ~12-18k",
+    "onsale_peak_queue_range": "headliner ~23-28k (notable — Helsinki is Pitbull's strongest EMEA market in this report)",
+    "edp_visits_range": "~49k (shared across both dates)",
+    "sample_size": 2
+  },
+  {
+    "venue": "O2 Arena",
+    "city": "Prague",
+    "capacity_note": "~18,000 cap",
+    "presale_peak_queue_range": "superstar ~17k (single data point; consistent figures)",
+    "onsale_peak_queue_range": "superstar ~15k (single data point; consistent figures)",
+    "edp_visits_range": "n/a",
+    "sample_size": 1
+  },
+  {
+    "venue": "Friends Arena",
+    "city": "Stockholm",
+    "capacity_note": "~65,000 cap",
+    "presale_peak_queue_range": "n/a",
+    "onsale_peak_queue_range": "megastar general ~32k (Beyoncé; strong for Sweden but lower than core markets)",
+    "edp_visits_range": "~6-15k per date at Taylor Swift level",
+    "sample_size": 3
+  },
+  {
+    "venue": "Stadthalle",
+    "city": "Vienna",
+    "capacity_note": "~16,000 cap",
+    "presale_peak_queue_range": "headliner ~6.5k (single data point)",
+    "onsale_peak_queue_range": "headliner ~3.8k (single data point)",
+    "edp_visits_range": "n/a",
+    "sample_size": 1
+  },
+  {
+    "venue": "Hallenstadion",
+    "city": "Zurich",
+    "capacity_note": "~15,000 cap",
+    "presale_peak_queue_range": "headliner ~7k (single data point)",
+    "onsale_peak_queue_range": "headliner ~10k (single data point)",
+    "edp_visits_range": "n/a",
+    "sample_size": 2
+  },
+  {
+    "venue": "Unipol Forum / Hippodrome San Siro area",
+    "city": "Milan",
+    "capacity_note": "n/a — capacity not stated",
+    "presale_peak_queue_range": "IT active users metric, not comparable to SmartQueue — no stated numeric benchmark range",
+    "onsale_peak_queue_range": "IT active users metric, not comparable to SmartQueue — no stated numeric benchmark range",
+    "edp_visits_range": "n/a",
+    "sample_size": 2
+  }
+]

@@ -1,0 +1,41 @@
+name: Sync onsale page-view data
+
+on:
+  schedule:
+    # Every 6 hours. Adjust to taste -- more frequent = fresher dashboard
+    # but more Claude API calls on changed sheets.
+    - cron: "0 */6 * * *"
+  workflow_dispatch: {}  # lets you trigger a run manually from the Actions tab
+
+permissions:
+  contents: write
+
+jobs:
+  sync:
+    runs-on: ubuntu-latest
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v4
+
+      - name: Set up Python
+        uses: actions/setup-python@v5
+        with:
+          python-version: "3.12"
+
+      - name: Install dependencies
+        run: pip install -r scripts/requirements.txt
+
+      - name: Run sync
+        env:
+          GDRIVE_SERVICE_ACCOUNT_JSON: ${{ secrets.GDRIVE_SERVICE_ACCOUNT_JSON }}
+          GDRIVE_FOLDER_ID: ${{ secrets.GDRIVE_FOLDER_ID }}
+          ANTHROPIC_API_KEY: ${{ secrets.ANTHROPIC_API_KEY }}
+        run: python scripts/sync_data.py
+
+      - name: Commit updated data
+        run: |
+          git config user.name "onsale-dashboard-bot"
+          git config user.email "actions@users.noreply.github.com"
+          git add data/onsales.json data/insights.json data/_sync_manifest.json
+          git diff --quiet --cached || git commit -m "Sync onsale data $(date -u +'%Y-%m-%dT%H:%M:%SZ')"
+          git push

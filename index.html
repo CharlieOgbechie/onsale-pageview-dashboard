@@ -1,0 +1,366 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8" />
+<title>Onsale Page View Dashboard</title>
+<meta name="viewport" content="width=device-width, initial-scale=1" />
+<script src="https://cdnjs.cloudflare.com/ajax/libs/Chart.js/4.4.4/chart.umd.min.js"></script>
+<style>
+  :root {
+    --bg: #0f1115;
+    --panel: #171a21;
+    --panel-2: #1e222b;
+    --border: #2a2f3a;
+    --text: #e7e9ee;
+    --muted: #9aa2b1;
+    --accent: #6ea8fe;
+    --accent-2: #f2b84b;
+    --good: #4fd18b;
+    --bad: #f27272;
+  }
+  * { box-sizing: border-box; }
+  body {
+    margin: 0;
+    font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, Helvetica, Arial, sans-serif;
+    background: var(--bg);
+    color: var(--text);
+  }
+  header {
+    padding: 20px 28px;
+    border-bottom: 1px solid var(--border);
+    display: flex;
+    justify-content: space-between;
+    align-items: baseline;
+    flex-wrap: wrap;
+    gap: 8px;
+  }
+  header h1 { font-size: 19px; margin: 0; font-weight: 600; }
+  header .sub { color: var(--muted); font-size: 13px; }
+  main {
+    display: grid;
+    grid-template-columns: 1fr 320px;
+    gap: 20px;
+    padding: 20px 28px 40px;
+    max-width: 1400px;
+    margin: 0 auto;
+  }
+  @media (max-width: 900px) { main { grid-template-columns: 1fr; } }
+  .panel {
+    background: var(--panel);
+    border: 1px solid var(--border);
+    border-radius: 10px;
+    padding: 18px;
+  }
+  .filters {
+    display: flex;
+    flex-wrap: wrap;
+    gap: 10px;
+    margin-bottom: 16px;
+  }
+  select, input {
+    background: var(--panel-2);
+    border: 1px solid var(--border);
+    color: var(--text);
+    border-radius: 6px;
+    padding: 7px 10px;
+    font-size: 13px;
+  }
+  .chart-wrap { position: relative; height: 360px; margin-bottom: 8px; }
+  table { width: 100%; border-collapse: collapse; font-size: 13px; margin-top: 6px; }
+  th, td { text-align: left; padding: 8px 10px; border-bottom: 1px solid var(--border); }
+  th { color: var(--muted); font-weight: 500; cursor: pointer; user-select: none; }
+  th:hover { color: var(--text); }
+  tr:hover td { background: var(--panel-2); }
+  .tier-megastar { color: #f27272; }
+  .tier-superstar { color: var(--accent-2); }
+  .tier-headliner { color: #f2e26b; }
+  .tier-rising { color: var(--good); }
+  .section-title { font-size: 13px; text-transform: uppercase; letter-spacing: .04em; color: var(--muted); margin: 0 0 12px; }
+  .insight {
+    border-left: 3px solid var(--accent);
+    padding: 8px 12px;
+    margin-bottom: 12px;
+    background: var(--panel-2);
+    border-radius: 0 6px 6px 0;
+  }
+  .insight h4 { margin: 0 0 4px; font-size: 13px; }
+  .insight p { margin: 0; font-size: 12.5px; color: var(--muted); line-height: 1.4; }
+  .empty { color: var(--muted); font-size: 13px; padding: 12px 0; }
+  .badge {
+    display: inline-block;
+    font-size: 11px;
+    padding: 2px 7px;
+    border-radius: 10px;
+    background: var(--panel-2);
+    border: 1px solid var(--border);
+    color: var(--muted);
+  }
+  .anomaly-badge { border-color: var(--bad); color: var(--bad); }
+</style>
+</head>
+<body>
+
+<header>
+  <div>
+    <h1>Onsale Page View Comparison Dashboard</h1>
+    <div class="sub">Page views &amp; queue demand across Live Nation onsales/shows</div>
+  </div>
+  <div class="sub" id="lastSynced">Loading…</div>
+</header>
+
+<main>
+  <div class="panel">
+    <p class="section-title">Compare shows</p>
+    <div class="filters">
+      <input id="searchBox" placeholder="Search artist or venue…" />
+      <select id="metricSelect">
+        <option value="edp">EDP views (event page)</option>
+        <option value="adp">ADP views (artist page)</option>
+        <option value="onsale_peak_queue">Onsale peak queue</option>
+        <option value="presale_peak_queue">Presale peak queue</option>
+      </select>
+      <select id="hourSelect"></select>
+      <select id="tierSelect">
+        <option value="">All tiers</option>
+        <option value="megastar">Megastar</option>
+        <option value="superstar">Superstar</option>
+        <option value="headliner">Headliner</option>
+        <option value="rising">Rising / Niche</option>
+      </select>
+      <select id="yearSelect"><option value="">All years</option></select>
+      <label style="display:flex;align-items:center;gap:6px;font-size:13px;color:var(--muted);">
+        <input type="checkbox" id="excludeAnomalies" checked style="width:auto;" /> exclude anomalies
+      </label>
+    </div>
+    <div class="chart-wrap"><canvas id="mainChart"></canvas></div>
+
+    <p class="section-title" style="margin-top:24px;">All shows</p>
+    <table id="dataTable">
+      <thead>
+        <tr>
+          <th data-key="artist">Artist</th>
+          <th data-key="venue">Venue</th>
+          <th data-key="city">City</th>
+          <th data-key="year">Year</th>
+          <th data-key="tier">Tier</th>
+          <th data-key="edp">EDP views</th>
+          <th data-key="adp">ADP views</th>
+          <th data-key="presale_peak_queue">Presale Q</th>
+          <th data-key="onsale_peak_queue">Onsale Q</th>
+        </tr>
+      </thead>
+      <tbody></tbody>
+    </table>
+  </div>
+
+  <div class="panel">
+    <p class="section-title">Claude analysis</p>
+    <div id="insights"><div class="empty">Loading insights…</div></div>
+  </div>
+</main>
+
+<script>
+const state = { onsales: [], insights: null, sort: { key: 'edp', dir: 'desc' } };
+
+function maxHourKey(record, field) {
+  const obj = record[field] || {};
+  const keys = Object.keys(obj).map(Number).filter(n => !isNaN(n));
+  return keys.length ? Math.max(...keys) : null;
+}
+
+function valueAtHour(record, field, hour) {
+  const obj = record[field] || {};
+  if (hour === 'max') {
+    const k = maxHourKey(record, field);
+    return k === null ? null : obj[String(k)];
+  }
+  return obj[String(hour)] ?? null;
+}
+
+function metricValue(record, metric, hour) {
+  if (metric === 'edp') return valueAtHour(record, 'edp_views_by_hour', hour);
+  if (metric === 'adp') return valueAtHour(record, 'adp_views_by_hour', hour);
+  if (metric === 'presale_peak_queue') return record.presale_peak_queue;
+  if (metric === 'onsale_peak_queue') return record.onsale_peak_queue;
+  return null;
+}
+
+function fmt(n) {
+  if (n === null || n === undefined) return '—';
+  return Number(n).toLocaleString();
+}
+
+function populateHourOptions() {
+  const hourSelect = document.getElementById('hourSelect');
+  const hours = new Set();
+  state.onsales.forEach(r => {
+    Object.keys(r.edp_views_by_hour || {}).forEach(h => hours.add(Number(h)));
+    Object.keys(r.adp_views_by_hour || {}).forEach(h => hours.add(Number(h)));
+  });
+  const sorted = [...hours].sort((a, b) => a - b);
+  hourSelect.innerHTML = '<option value="max">Peak available</option>' +
+    sorted.map(h => `<option value="${h}">at +${h}h</option>`).join('');
+}
+
+function populateYearOptions() {
+  const yearSelect = document.getElementById('yearSelect');
+  const years = [...new Set(state.onsales.map(r => r.year).filter(Boolean))].sort((a, b) => b - a);
+  years.forEach(y => {
+    const opt = document.createElement('option');
+    opt.value = y; opt.textContent = y;
+    yearSelect.appendChild(opt);
+  });
+}
+
+function filteredRecords() {
+  const q = document.getElementById('searchBox').value.trim().toLowerCase();
+  const tier = document.getElementById('tierSelect').value;
+  const year = document.getElementById('yearSelect').value;
+  const excludeAnomalies = document.getElementById('excludeAnomalies').checked;
+  return state.onsales.filter(r => {
+    if (excludeAnomalies && r.anomaly) return false;
+    if (r.is_comparable_reference) return false;
+    if (tier && r.tier !== tier) return false;
+    if (year && String(r.year) !== year) return false;
+    if (q) {
+      const hay = `${r.artist} ${r.venue} ${r.city}`.toLowerCase();
+      if (!hay.includes(q)) return false;
+    }
+    return true;
+  });
+}
+
+let chart;
+function renderChart() {
+  const metric = document.getElementById('metricSelect').value;
+  const hour = document.getElementById('hourSelect').value;
+  const rows = filteredRecords()
+    .map(r => ({ r, v: metricValue(r, metric, hour) }))
+    .filter(x => x.v !== null && x.v !== undefined)
+    .sort((a, b) => b.v - a.v)
+    .slice(0, 15);
+
+  const ctx = document.getElementById('mainChart').getContext('2d');
+  const labels = rows.map(x => `${x.r.artist} — ${x.r.venue}`);
+  const data = rows.map(x => x.v);
+
+  if (chart) chart.destroy();
+  chart = new Chart(ctx, {
+    type: 'bar',
+    data: {
+      labels,
+      datasets: [{
+        label: document.getElementById('metricSelect').selectedOptions[0].textContent,
+        data,
+        backgroundColor: '#6ea8fe',
+        borderRadius: 4,
+      }],
+    },
+    options: {
+      indexAxis: 'y',
+      responsive: true,
+      maintainAspectRatio: false,
+      plugins: { legend: { display: false } },
+      scales: {
+        x: { ticks: { color: '#9aa2b1' }, grid: { color: '#2a2f3a' } },
+        y: { ticks: { color: '#e7e9ee', font: { size: 11 } }, grid: { display: false } },
+      },
+    },
+  });
+}
+
+function renderTable() {
+  const tbody = document.querySelector('#dataTable tbody');
+  const hour = document.getElementById('hourSelect').value;
+  let rows = filteredRecords().map(r => ({
+    ...r,
+    edp: valueAtHour(r, 'edp_views_by_hour', hour),
+    adp: valueAtHour(r, 'adp_views_by_hour', hour),
+  }));
+  const { key, dir } = state.sort;
+  rows.sort((a, b) => {
+    let av = a[key], bv = b[key];
+    if (av === null || av === undefined) av = -Infinity;
+    if (bv === null || bv === undefined) bv = -Infinity;
+    if (typeof av === 'string') return dir === 'asc' ? av.localeCompare(bv) : bv.localeCompare(av);
+    return dir === 'asc' ? av - bv : bv - av;
+  });
+  tbody.innerHTML = rows.map(r => `
+    <tr>
+      <td>${r.artist}${r.anomaly ? ' <span class="badge anomaly-badge">anomaly</span>' : ''}</td>
+      <td>${r.venue}</td>
+      <td>${r.city || ''}</td>
+      <td>${r.year || ''}</td>
+      <td class="tier-${r.tier || ''}">${r.tier || '—'}</td>
+      <td>${fmt(r.edp)}</td>
+      <td>${fmt(r.adp)}</td>
+      <td>${fmt(r.presale_peak_queue)}</td>
+      <td>${fmt(r.onsale_peak_queue)}</td>
+    </tr>
+  `).join('') || '<tr><td colspan="9" class="empty">No shows match these filters.</td></tr>';
+}
+
+function renderInsights() {
+  const el = document.getElementById('insights');
+  if (!state.insights || !state.insights.insights || !state.insights.insights.length) {
+    el.innerHTML = '<div class="empty">No precomputed insights yet — these are generated by Claude each time the scheduled sync runs. Once the GitHub Action has run at least once, they\'ll show up here.</div>';
+    return;
+  }
+  el.innerHTML = state.insights.insights.map(i => `
+    <div class="insight">
+      <h4>${i.headline}</h4>
+      <p>${i.detail}</p>
+    </div>
+  `).join('');
+}
+
+function renderAll() {
+  renderChart();
+  renderTable();
+  renderInsights();
+}
+
+document.querySelectorAll('#dataTable th').forEach(th => {
+  th.addEventListener('click', () => {
+    const key = th.dataset.key;
+    if (state.sort.key === key) state.sort.dir = state.sort.dir === 'asc' ? 'desc' : 'asc';
+    else state.sort = { key, dir: 'desc' };
+    renderTable();
+  });
+});
+
+['searchBox', 'metricSelect', 'hourSelect', 'tierSelect', 'yearSelect', 'excludeAnomalies'].forEach(id => {
+  document.getElementById(id).addEventListener('input', renderAll);
+});
+
+async function loadData() {
+  try {
+    const res = await fetch('data/onsales.json', { cache: 'no-store' });
+    state.onsales = await res.json();
+  } catch (e) {
+    document.getElementById('lastSynced').textContent = 'Could not load data/onsales.json';
+    return;
+  }
+  try {
+    const res2 = await fetch('data/insights.json', { cache: 'no-store' });
+    state.insights = await res2.json();
+  } catch (e) {
+    state.insights = null;
+  }
+
+  populateHourOptions();
+  populateYearOptions();
+
+  const lastSyncTimes = state.onsales.map(r => r.last_synced).filter(Boolean).sort();
+  const latest = state.insights?.generated_at || lastSyncTimes[lastSyncTimes.length - 1];
+  document.getElementById('lastSynced').textContent = latest
+    ? `Last synced ${new Date(latest).toLocaleString()}`
+    : 'Seed data — no live sync yet';
+
+  renderAll();
+}
+
+loadData();
+</script>
+</body>
+</html>
