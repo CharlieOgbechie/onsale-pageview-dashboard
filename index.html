@@ -247,6 +247,53 @@
   }
   .detail-table td { padding: 6px 20px 6px 42px; border-bottom: 1px solid var(--border); }
   .detail-table tr:last-child td { border-bottom: none; }
+
+  header {
+    position: sticky;
+    top: 0;
+    z-index: 20;
+    background: var(--bg);
+  }
+  .main-nav {
+    position: sticky;
+    top: 61px; /* sits right under the header */
+    z-index: 19;
+    display: flex;
+    gap: 4px;
+    padding: 0 28px;
+    background: var(--bg);
+    border-bottom: 1px solid var(--border);
+    max-width: 1400px;
+    margin: 0 auto;
+    overflow-x: auto;
+  }
+  .nav-btn {
+    display: flex;
+    align-items: center;
+    gap: 7px;
+    background: none;
+    border: none;
+    border-bottom: 2px solid transparent;
+    color: var(--muted);
+    padding: 14px 16px;
+    font-size: 13.5px;
+    font-weight: 500;
+    cursor: pointer;
+    white-space: nowrap;
+    transition: color 0.15s ease, border-color 0.15s ease;
+  }
+  .nav-btn:hover { color: var(--text); }
+  .nav-btn.active { color: var(--accent); border-bottom-color: var(--accent); font-weight: 600; }
+  .nav-icon { font-size: 13px; }
+  .tab-panel { display: flex; flex-direction: column; gap: 20px; }
+  .filter-panel { box-shadow: 0 1px 0 rgba(0,0,0,0.2); }
+  .panel {
+    box-shadow: 0 1px 3px rgba(0,0,0,0.25);
+  }
+  @media (max-width: 700px) {
+    .main-nav { top: 73px; }
+    .nav-btn { padding: 12px 10px; font-size: 12.5px; }
+  }
 </style>
 </head>
 <body>
@@ -259,10 +306,23 @@
   <div class="sub" id="lastSynced">Loading…</div>
 </header>
 
-<main>
-  <div class="panel">
-    <p class="section-title">Compare shows</p>
+<nav class="main-nav">
+  <button type="button" class="nav-btn active" data-tab="compare">
+    <span class="nav-icon">📊</span> Compare Shows
+  </button>
+  <button type="button" class="nav-btn" data-tab="tours">
+    <span class="nav-icon">📋</span> All Tours
+  </button>
+  <button type="button" class="nav-btn" data-tab="commentary">
+    <span class="nav-icon">💬</span> Page View Commentary
+  </button>
+  <button type="button" class="nav-btn" data-tab="ask">
+    <span class="nav-icon">✦</span> Ask a Question
+  </button>
+</nav>
 
+<main>
+  <div class="panel filter-panel">
     <div class="view-toggle">
       <button type="button" id="viewShowBtn">By show</button>
       <button type="button" id="viewTourBtn" class="active">By tour</button>
@@ -302,38 +362,52 @@
         <input type="checkbox" id="excludeAnomalies" checked style="width:auto;" /> exclude anomalies
       </label>
     </div>
-    <div class="chart-wrap"><canvas id="mainChart"></canvas></div>
+    <p class="compare-hint" style="margin:10px 0 0;">These filters apply on both the Compare Shows and All Tours tabs.</p>
+  </div>
 
+  <section id="tab-compare" class="tab-panel">
+    <div class="panel">
+      <p class="section-title">Compare shows</p>
+      <div class="chart-wrap"><canvas id="mainChart"></canvas></div>
+    </div>
     <div id="comparisonSummary" class="panel comparison-summary" style="display:none;"></div>
+  </section>
 
-    <div style="display:flex; align-items:baseline; justify-content:space-between; margin-top:24px;">
-      <p class="section-title" id="tableTitle" style="margin:0;">All shows</p>
-      <span class="compare-hint" id="tableCount"></span>
+  <section id="tab-tours" class="tab-panel" style="display:none;">
+    <div class="panel">
+      <div style="display:flex; align-items:baseline; justify-content:space-between;">
+        <p class="section-title" id="tableTitle" style="margin:0;">All shows</p>
+        <span class="compare-hint" id="tableCount"></span>
+      </div>
+      <table id="dataTable">
+        <thead><tr></tr></thead>
+        <tbody></tbody>
+      </table>
+      <div id="tablePagination" class="pagination"></div>
     </div>
-    <table id="dataTable">
-      <thead><tr></tr></thead>
-      <tbody></tbody>
-    </table>
-    <div id="tablePagination" class="pagination"></div>
-  </div>
+  </section>
 
-  <div class="panel">
-    <p class="section-title">Page view commentary</p>
-    <div id="insights"><div class="empty">Loading insights…</div></div>
-  </div>
-
-  <div class="panel">
-    <p class="section-title">Ask a question</p>
-    <p class="compare-hint" style="margin:-6px 0 12px;">
-      Ask about a tour, a venue benchmark, or "what changed" — this calls Claude live against the
-      current data. Answers can take a few seconds.
-    </p>
-    <div class="ask-box">
-      <input id="askInput" placeholder="e.g. How does BTS's Tottenham Hotspur pacing compare to other stadium tours there?" />
-      <button id="askSubmit" type="button">Ask</button>
+  <section id="tab-commentary" class="tab-panel" style="display:none;">
+    <div class="panel">
+      <p class="section-title">Page view commentary</p>
+      <div id="insights"><div class="empty">Loading insights…</div></div>
     </div>
-    <div id="askAnswer"></div>
-  </div>
+  </section>
+
+  <section id="tab-ask" class="tab-panel" style="display:none;">
+    <div class="panel">
+      <p class="section-title">Ask a question</p>
+      <p class="compare-hint" style="margin:-6px 0 12px;">
+        Ask about a tour, a venue benchmark, or "what changed" — this calls Claude live against the
+        current data. Answers can take a few seconds.
+      </p>
+      <div class="ask-box">
+        <input id="askInput" placeholder="e.g. How does BTS's Tottenham Hotspur pacing compare to other stadium tours there?" />
+        <button id="askSubmit" type="button">Ask</button>
+      </div>
+      <div id="askAnswer"></div>
+    </div>
+  </section>
 </main>
 
 <script>
@@ -948,6 +1022,23 @@ document.querySelector('#dataTable tbody').addEventListener('click', (e) => {
 });
 document.getElementById('viewShowBtn').addEventListener('click', () => setViewMode('show'));
 document.getElementById('viewTourBtn').addEventListener('click', () => setViewMode('tour'));
+
+// --------------------------------------------------------------------------
+// Top nav: switches which section is visible. Filters stay in a shared bar
+// above the tabs since Compare Shows and All Tours both read from them.
+// --------------------------------------------------------------------------
+function setActiveTab(tab) {
+  document.querySelectorAll('.tab-panel').forEach(el => {
+    el.style.display = el.id === `tab-${tab}` ? '' : 'none';
+  });
+  document.querySelectorAll('.nav-btn').forEach(btn => {
+    btn.classList.toggle('active', btn.dataset.tab === tab);
+  });
+  window.scrollTo({ top: 0, behavior: 'smooth' });
+}
+document.querySelectorAll('.nav-btn').forEach(btn => {
+  btn.addEventListener('click', () => setActiveTab(btn.dataset.tab));
+});
 
 async function loadData() {
   try {
