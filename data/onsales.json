@@ -2455,9 +2455,9 @@
       "72": 221579
     },
     "presale_peak_queue": null,
-    "onsale_peak_queue": null,
-    "notes": "ADP figures shown are TM_ES country-level. Tier set to megastar based on the very large view volumes (100k+ in 12h) which are far above other artists in this dataset, consistent with BTS's known global superstar status.",
-    "last_synced": "2026-07-07T11:36:25Z",
+    "onsale_peak_queue": 22888,
+    "notes": "ADP figures shown are TM_ES country-level. Tier set to megastar based on the very large view volumes (100k+ in 12h) which are far above other artists in this dataset, consistent with BTS's known global superstar status. Onsale peak queue derived from separate queue-tracking section in 'BTS - RELEASES EU/UK 2026' file for the same date/venue.",
+    "last_synced": "2026-07-07T16:20:00Z",
     "source_modified_time": "2026-06-19T15:00:46.530Z"
   },
   {
@@ -2487,9 +2487,9 @@
       "72": 120421
     },
     "presale_peak_queue": null,
-    "onsale_peak_queue": null,
-    "notes": "ADP figures shown are TM_BE country-level in source row ordering — may be a market-order artifact rather than literally Belgium data for a Madrid show; treat ADP country label with caution.",
-    "last_synced": "2026-07-07T11:36:25Z",
+    "onsale_peak_queue": 28861,
+    "notes": "ADP figures shown are TM_BE country-level in source row ordering — may be a market-order artifact rather than literally Belgium data for a Madrid show; treat ADP country label with caution. Onsale peak queue derived from separate queue-tracking section in 'BTS - RELEASES EU/UK 2026' file for the same date/venue.",
+    "last_synced": "2026-07-07T16:20:00Z",
     "source_modified_time": "2026-06-19T15:00:46.530Z"
   },
   {
@@ -2519,9 +2519,9 @@
       "72": 124471
     },
     "presale_peak_queue": null,
-    "onsale_peak_queue": null,
-    "notes": "ADP country column values shown correspond to TM_UK in the raw row ordering; country-level ADP labels appear offset relative to EDP show rows.",
-    "last_synced": "2026-07-07T11:36:25Z",
+    "onsale_peak_queue": 13461,
+    "notes": "ADP country column values shown correspond to TM_UK in the raw row ordering; country-level ADP labels appear offset relative to EDP show rows. Onsale peak queue derived from separate queue-tracking section in 'BTS - RELEASES EU/UK 2026' file for the same date/venue.",
+    "last_synced": "2026-07-07T16:20:00Z",
     "source_modified_time": "2026-06-19T15:00:46.530Z"
   },
   {
@@ -2531,7 +2531,7 @@
     "source_file": "BTS - EU/UK 2026 Tour",
     "source_file_id": "1HTbLZlQd_UgROn69mP1l1SoGM1cG4r4543fJw6GRqv4",
     "is_comparable_reference": false,
-    "anomaly": false,
+    "anomaly": true,
     "venue": "King Baudouin Stadium",
     "city": "Brussels",
     "country": "Belgium",
@@ -2551,9 +2551,9 @@
       "72": 390259
     },
     "presale_peak_queue": null,
-    "onsale_peak_queue": null,
-    "notes": "ADP values shown (TM_DE in raw order) are far larger than EDP for this row, likely a country-level DE aggregate rather than a Brussels-specific figure. Flagged as anomaly due to scale mismatch vs EDP.",
-    "last_synced": "2026-07-07T11:36:25Z",
+    "onsale_peak_queue": 13351,
+    "notes": "ADP values shown (TM_DE in raw order) are far larger than EDP for this row, likely a country-level DE aggregate rather than a Brussels-specific figure. Flagged as anomaly due to scale mismatch vs EDP. Onsale peak queue derived from separate queue-tracking section in 'BTS - RELEASES EU/UK 2026' file for the same date/venue.",
+    "last_synced": "2026-07-07T16:20:00Z",
     "source_modified_time": "2026-06-19T15:00:46.530Z"
   },
   {

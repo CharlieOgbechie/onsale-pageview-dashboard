@@ -1,6 +1,18 @@
 {
-  "generated_at": "2026-07-07T11:36:25Z",
+  "generated_at": "2026-07-07T16:20:00Z",
   "insights": [
+    {
+      "headline": "BTS Madrid and Brussels onsale queues now filled in - both pace below their venue's historical range",
+      "detail": "A previously-unsynced file ('BTS - RELEASES EU/UK 2026') supplied onsale peak queue figures that were null for four BTS dates. Riyadh Air Metropolitano, Madrid: 22,888 (26 Jun) and 28,861 (27 Jun) vs. the venue baseline's megastar range of ~57k-86k - both land inside the lower 'superstar residency' band (~7k-49k) instead. King Baudouin Stadium, Brussels: 13,461 (1 Jul) and 13,351 (2 Jul) vs. a baseline range of ~61k-125k - though that baseline has only 2 prior data points and is explicitly a Beyonce outlier, so it's a thin comparison. Venue-match basis throughout; the Madrid baseline range may also partly reflect this same BTS tour's own historical figures rather than being fully independent.",
+      "related_ids": ["bts-riyadh-air-metropolitano-madrid-2026-06-26", "bts-riyadh-air-metropolitano-madrid-2026-06-27", "bts-king-baudouin-stadium-brussels-2026-07-01", "bts-king-baudouin-stadium-brussels-2026-07-02"],
+      "category": "general"
+    },
+    {
+      "headline": "BTS tour sheet shows the same ADP country-column offset pattern seen in Don Toliver's sheet",
+      "detail": "Newly-filled-in records for Madrid and Brussels show ADP country labels (TM_ES, TM_BE, TM_UK, TM_DE) that don't match the show's actual market - e.g. the 2 Jul Brussels row carries a TM_DE-labelled ADP figure far larger than its own EDP figure, a scale mismatch consistent with a row-offset bug. That record's anomaly flag was left false despite its own note describing it as flagged; corrected to anomaly:true this run. Same underlying pattern as the previously-flagged Don Toliver sheet, just on a different tour file - worth checking whether the extraction/paste process has a shared root cause.",
+      "related_ids": ["bts-riyadh-air-metropolitano-madrid-2026-06-26", "bts-riyadh-air-metropolitano-madrid-2026-06-27", "bts-king-baudouin-stadium-brussels-2026-07-01", "bts-king-baudouin-stadium-brussels-2026-07-02"],
+      "category": "data_quality"
+    },
     {
       "headline": "Two Drive files contain the wrong artist's data entirely",
       "detail": "\"KATSEYE - EU/UK Tour 2026\" actually contains BTS/aespa/TWICE/BLACKPINK tracking tables, not KATSEYE data, and \"The Strokes - UK/EU 2026 Tour\" duplicates the aespa tracker instead of Strokes data. Both were kept and flagged (is_comparable_reference/anomaly) rather than discarded, but the underlying files need to be re-saved with correct content before they're usable for KATSEYE or Strokes reporting.",

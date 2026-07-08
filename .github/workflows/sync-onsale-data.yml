@@ -1,11 +1,15 @@
 name: Sync onsale page-view data
 
 on:
-  schedule:
-    # Every 6 hours. Adjust to taste -- more frequent = fresher dashboard
-    # but more Claude API calls on changed sheets.
-    - cron: "0 */6 * * *"
-  workflow_dispatch: {}  # lets you trigger a run manually from the Actions tab
+  # Automatic schedule disabled: this path needs a Google Cloud service
+  # account (GDRIVE_SERVICE_ACCOUNT_JSON / GDRIVE_FOLDER_ID / ANTHROPIC_API_KEY
+  # secrets) that isn't set up -- see README "Advanced" section. The live
+  # dashboard is currently synced by a Cowork scheduled task instead, which
+  # doesn't need this workflow at all. Re-enable the schedule block below if
+  # IT ever provisions a GCP project and you switch to this path.
+  # schedule:
+  #   - cron: "0 */6 * * *"
+  workflow_dispatch: {}  # lets you trigger a run manually from the Actions tab, once secrets are set
 
 permissions:
   contents: write
